@@ -49,6 +49,71 @@ impl SecurityAssumption {
         // TODO: The folding_factor is not exactly correct
         field_size_bits as f64 - (error + folding_factor as f64)
     }
+
+    /// Compute a number of queries to match the security level
+    pub fn queries(&self, protocol_security_level: usize, log_inv_rate: usize) -> usize {
+        let num_queries_f = match self {
+            Self::UniqueDecoding => {
+                let rate = 1. / ((1 << log_inv_rate) as f64);
+                let denom = (0.5 * (1. + rate)).log2();
+
+                -(protocol_security_level as f64) / denom
+            }
+            Self::JohnsonBound => (2 * protocol_security_level) as f64 / log_inv_rate as f64,
+            Self::CapacityBound => protocol_security_level as f64 / log_inv_rate as f64,
+        };
+
+        num_queries_f.ceil() as usize
+    }
+
+    pub fn queries_error(&self, log_inv_rate: usize, num_queries: usize) -> f64 {
+        let num_queries = num_queries as f64;
+        match self {
+            Self::UniqueDecoding => {
+                let rate = 1. / ((1 << log_inv_rate) as f64);
+                let denom = -(0.5 * (1. + rate)).log2();
+
+                num_queries * denom
+            }
+            Self::JohnsonBound => num_queries * 0.5 * log_inv_rate as f64,
+            Self::CapacityBound => num_queries * log_inv_rate as f64,
+        }
+    }
+
+    pub fn ood_error(
+        &self,
+        log_degree: usize,
+        log_inv_rate: usize,
+        field_size_bits: usize,
+        ood_samples: usize,
+    ) -> f64 {
+        let list_size_bits = self.list_size_bits(log_degree, log_inv_rate);
+
+        let error = 2. * list_size_bits + (log_degree * ood_samples) as f64;
+        (ood_samples * field_size_bits) as f64 + 1. - error
+    }
+
+    pub fn ood_samples(
+        &self,
+        security_level: usize,
+        log_degree: usize,
+        log_inv_rate: usize,
+        field_size_bits: usize,
+    ) -> usize {
+        if matches!(self, Self::UniqueDecoding) {
+            0
+        } else {
+            for ood_samples in 1..64 {
+                if self.ood_error(log_degree, log_inv_rate, field_size_bits, ood_samples)
+                    >= security_level as f64
+                {
+                    return ood_samples;
+                }
+            }
+
+            panic!("Could not find an appropriate number of OOD samples");
+        }
+    }
 }
 
 impl Display for SecurityAssumption {
