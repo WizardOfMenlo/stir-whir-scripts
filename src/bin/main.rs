@@ -8,7 +8,7 @@ fn main() {
     let ldt_parameters = LowDegreeParameters {
         field: GOLDILOCKS_2,
         log_degree: 20,
-        batch_size: 100,
+        batch_size: 1,
     };
 
     let stir_parameters = StirParameters {
