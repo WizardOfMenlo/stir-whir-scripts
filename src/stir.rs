@@ -1,6 +1,10 @@
 use std::fmt::Display;
 
-use crate::{errors::SecurityAssumption, LowDegreeParameters};
+use crate::{
+    errors::SecurityAssumption,
+    proof_size::{FieldElements, MerkleQueries, MerkleTree, Proof, ProofElement, ProofRound},
+    LowDegreeParameters,
+};
 
 #[derive(Clone)]
 pub struct StirParameters {
@@ -193,6 +197,64 @@ impl StirConfig {
             final_log_degree,
             final_log_inv_rate: log_inv_rate,
         }
+    }
+
+    pub fn build_proof(&self) -> Proof {
+        let mut current_merkle_tree = MerkleTree::new(
+            self.ldt_parameters.log_degree + self.starting_log_inv_rate
+                - self.starting_folding_factor,
+            self.ldt_parameters.field,
+            (1 << self.starting_folding_factor) * self.ldt_parameters.batch_size,
+            true,
+        );
+
+        let mut proof = Vec::with_capacity(self.round_parameters.len() + 1);
+
+        for (round_number, r) in self.round_parameters.iter().enumerate() {
+            let mut proof_elements = Vec::with_capacity(3);
+            let next_merkle_tree = MerkleTree::new(
+                r.evaluation_domain_log_size - r.folding_factor,
+                self.ldt_parameters.field,
+                1 << r.folding_factor,
+                true,
+            );
+
+            // The merkle root
+            proof_elements.push(ProofElement::MerkleRoot(next_merkle_tree));
+
+            // The ood samples
+            if r.ood_samples > 0 {
+                proof_elements.push(ProofElement::FieldElements(FieldElements {
+                    field: self.ldt_parameters.field,
+                    num_elements: r.ood_samples,
+                    is_extension: true,
+                }));
+            }
+
+            // The queries
+            proof_elements.push(ProofElement::MerkleQueries(MerkleQueries {
+                merkle_tree: current_merkle_tree,
+                num_openings: r.num_queries,
+            }));
+
+            proof.push(ProofRound {
+                round_number,
+                proof_elements,
+            });
+
+            current_merkle_tree = next_merkle_tree;
+        }
+
+        // The final queries
+        proof.push(ProofRound {
+            round_number: self.round_parameters.len(),
+            proof_elements: vec![ProofElement::MerkleQueries(MerkleQueries {
+                merkle_tree: current_merkle_tree,
+                num_openings: self.final_queries,
+            })],
+        });
+
+        Proof(proof)
     }
 
     fn print_config_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

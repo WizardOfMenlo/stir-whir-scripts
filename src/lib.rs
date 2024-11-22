@@ -4,6 +4,7 @@ use field::Field;
 
 pub mod errors;
 pub mod field;
+pub mod proof_size;
 pub mod stir;
 pub mod whir;
 
