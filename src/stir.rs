@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{errors::SecurityAssumption, LowDegreeParameters};
 
 #[derive(Clone)]
@@ -80,10 +82,11 @@ impl StirConfig {
             0.max(stir_parameters.security_level - stir_parameters.pow_bits);
 
         // Initial domain size (the trace domain)
-        let starting_folding_factor = stir_parameters.folding_factors[0];
+        let starting_folding_factor = stir_parameters.starting_folding_factor;
         let starting_domain_log_size =
             ldt_parameters.log_degree + stir_parameters.starting_log_inv_rate;
 
+        // Degree of next polynomial to send
         let mut current_log_degree = ldt_parameters.log_degree - starting_folding_factor;
         let mut log_inv_rate = stir_parameters.starting_log_inv_rate;
 
@@ -94,7 +97,7 @@ impl StirConfig {
                 current_log_degree,
                 log_inv_rate,
                 ldt_parameters.field.extension_bit_size(),
-                stir_parameters.folding_factors[0],
+                starting_folding_factor,
             ),
         );
 
@@ -105,8 +108,8 @@ impl StirConfig {
             .into_iter()
             .zip(stir_parameters.evaluation_domain_log_sizes)
         {
-            // Queries are set w.r.t. to the old rate, while the reset to the new rate
-            let next_rate = new_evaluation_domain_size - (current_log_degree - folding_factor);
+            // This is the rate of the codeword g
+            let next_rate = new_evaluation_domain_size - current_log_degree;
 
             // Compute the ood samples required
             let ood_samples = stir_parameters.security_assumption.ood_samples(
@@ -126,12 +129,13 @@ impl StirConfig {
                 .security_assumption
                 .queries_error(log_inv_rate, num_queries);
 
+            let num_terms = num_queries + ood_samples;
             let prox_gaps_error_1 = stir_parameters.security_assumption.prox_gaps_error(
                 current_log_degree,
                 next_rate,
                 ldt_parameters.field.extension_bit_size(),
-                ((num_queries + ood_samples) as f64).log2().ceil() as usize, // We want this in log
-                                                                             // form
+                (num_terms as f64).log2().ceil() as usize, // We want this in log
+                                                           // form
             );
 
             let prox_gaps_error_2 = stir_parameters.security_assumption.prox_gaps_error(
@@ -189,5 +193,126 @@ impl StirConfig {
             final_log_degree,
             final_log_inv_rate: log_inv_rate,
         }
+    }
+}
+
+impl Display for StirConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.ldt_parameters.fmt(f)?;
+        writeln!(
+            f,
+            "Security level: {} bits using {} security and {} bits of PoW",
+            self.security_level, self.security_assumption, self.max_pow_bits
+        )?;
+
+        writeln!(
+            f,
+            "Initial folding factor: {}, initial_folding_pow_bits: {}",
+            self.starting_folding_factor, self.starting_folding_pow_bits
+        )?;
+        for r in &self.round_parameters {
+            r.fmt(f)?;
+        }
+
+        writeln!(
+            f,
+            "final_queries: {}, final_rate: 2^-{}, final_pow_bits: {}",
+            self.final_queries, self.final_log_inv_rate, self.final_pow_bits,
+        )?;
+
+        writeln!(f, "------------------------------------")?;
+        writeln!(f, "Round by round soundness analysis:")?;
+        writeln!(f, "------------------------------------")?;
+
+        let mut current_log_degree = self.ldt_parameters.log_degree - self.starting_folding_factor;
+        let mut log_inv_rate = self.starting_log_inv_rate;
+
+        let starting_prox_gaps_error = self.security_assumption.prox_gaps_error(
+            current_log_degree,
+            log_inv_rate,
+            self.ldt_parameters.field.extension_bit_size(),
+            self.starting_folding_factor,
+        );
+
+        writeln!(
+            f,
+            "{:.1} bits -- prox gaps: {:.1}, pow: {:.1}",
+            starting_prox_gaps_error + self.starting_folding_pow_bits as f64,
+            starting_prox_gaps_error,
+            self.starting_folding_pow_bits,
+        )?;
+
+        for r in &self.round_parameters {
+            let next_rate = r.evaluation_domain_log_size - current_log_degree;
+
+            // OOD error
+            if r.ood_samples > 0 {
+                let ood_error = self.security_assumption.ood_error(
+                    current_log_degree,
+                    next_rate,
+                    self.ldt_parameters.field.extension_bit_size(),
+                    r.ood_samples,
+                );
+
+                writeln!(f, "{:.1} bits -- OOD sample", ood_error)?;
+            }
+
+            // STIR error
+            let query_error = self
+                .security_assumption
+                .queries_error(log_inv_rate, r.num_queries);
+
+            let prox_gaps_error_1 = self.security_assumption.prox_gaps_error(
+                current_log_degree,
+                next_rate,
+                self.ldt_parameters.field.extension_bit_size(),
+                ((r.num_queries + r.ood_samples) as f64).log2().ceil() as usize, // We want this in log
+                                                                                 // form
+            );
+
+            let prox_gaps_error_2 = self.security_assumption.prox_gaps_error(
+                current_log_degree - r.folding_factor,
+                next_rate,
+                self.ldt_parameters.field.extension_bit_size(),
+                r.folding_factor,
+            );
+
+            writeln!(
+                f,
+                "{:.1} bits -- query error: {:.1}, degree correction: {:.1}, folding error: {:.1}, pow: {:.1}",
+                query_error.min(prox_gaps_error_1.min(prox_gaps_error_2)) + r.pow_bits as f64,
+                query_error,
+                prox_gaps_error_1,
+                prox_gaps_error_2,
+                r.pow_bits,
+            )?;
+
+            current_log_degree -= r.folding_factor;
+            log_inv_rate = next_rate;
+        }
+
+        let final_query_error = self
+            .security_assumption
+            .queries_error(log_inv_rate, self.final_queries);
+
+        writeln!(
+            f,
+            "{:.1} bits -- query error: {:.1}, pow: {:.1}",
+            final_query_error + self.final_pow_bits as f64,
+            final_query_error,
+            self.final_pow_bits
+        )?;
+
+        Ok(())
+    }
+}
+
+impl Display for RoundConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Folding factor: {}, domain_size: 2^{}, num_queries: {}, rate: 2^-{}, pow_bits: {}, ood_samples: {}",
+            self.folding_factor, self.evaluation_domain_log_size, self.num_queries, self.log_inv_rate, self.pow_bits, self.ood_samples,
+        )
     }
 }
