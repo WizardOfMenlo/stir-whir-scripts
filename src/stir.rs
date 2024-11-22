@@ -201,8 +201,7 @@ impl StirConfig {
 
     pub fn build_proof(&self) -> Proof {
         let mut current_merkle_tree = MerkleTree::new(
-            self.ldt_parameters.log_degree + self.starting_log_inv_rate
-                - self.starting_folding_factor,
+            self.starting_domain_log_size - self.starting_folding_factor,
             self.ldt_parameters.field,
             (1 << self.starting_folding_factor) * self.ldt_parameters.batch_size,
             true,
@@ -381,7 +380,7 @@ impl StirConfig {
 impl Display for StirConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.print_config_summary(f)?;
-        self.print_rbr_summary(f);
+        self.print_rbr_summary(f)?;
         writeln!(f, "{}", self.build_proof())
     }
 }

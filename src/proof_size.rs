@@ -75,7 +75,7 @@ impl Display for Proof {
             for element in &r.proof_elements {
                 match element {
                     ProofElement::MerkleRoot(tree) => {
-                        writeln!(f, "Merkle root: {}", display_size(tree.digest_size));
+                        writeln!(f, "Merkle root: {}", display_size(tree.digest_size))?;
                     }
                     ProofElement::MerkleQueries(queries) => {
                         writeln!(
@@ -85,7 +85,7 @@ impl Display for Proof {
                             display_size(queries.copath_size()),
                             display_size(queries.opening_size()),
                             display_size(queries.estimate_size_bits())
-                        );
+                        )?;
                     }
                     ProofElement::FieldElements(elems) => {
                         writeln!(
@@ -98,7 +98,7 @@ impl Display for Proof {
                                 "base"
                             },
                             display_size(elems.size_bits())
-                        );
+                        )?;
                     }
                 }
             }
