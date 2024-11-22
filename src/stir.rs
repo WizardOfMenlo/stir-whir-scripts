@@ -313,7 +313,7 @@ impl StirConfig {
         writeln!(
             f,
             "{:.1} bits -- prox gaps: {:.1}, pow: {:.1}",
-            starting_prox_gaps_error + self.starting_folding_pow_bits as f64,
+            starting_prox_gaps_error + self.starting_folding_pow_bits,
             starting_prox_gaps_error,
             self.starting_folding_pow_bits,
         )?;
@@ -356,7 +356,7 @@ impl StirConfig {
             writeln!(
                 f,
                 "{:.1} bits -- query error: {:.1}, degree correction: {:.1}, folding error: {:.1}, pow: {:.1}",
-                query_error.min(prox_gaps_error_1.min(prox_gaps_error_2)) + r.pow_bits as f64,
+                query_error.min(prox_gaps_error_1.min(prox_gaps_error_2)) + r.pow_bits,
                 query_error,
                 prox_gaps_error_1,
                 prox_gaps_error_2,
@@ -374,7 +374,7 @@ impl StirConfig {
         writeln!(
             f,
             "{:.1} bits -- query error: {:.1}, pow: {:.1}",
-            final_query_error + self.final_pow_bits as f64,
+            final_query_error + self.final_pow_bits,
             final_query_error,
             self.final_pow_bits
         )?;
