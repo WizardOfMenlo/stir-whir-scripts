@@ -2,9 +2,9 @@ use std::fmt::Display;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Field {
-    name: &'static str,
-    field_size_bits: usize,
-    extension_degree: usize,
+    pub name: &'static str,
+    pub field_size_bits: usize,
+    pub extension_degree: usize,
 }
 
 pub const GOLDILOCKS_2: Field = Field {

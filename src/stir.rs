@@ -248,10 +248,17 @@ impl StirConfig {
         // The final queries
         proof.push(ProofRound {
             round_number: self.round_parameters.len(),
-            proof_elements: vec![ProofElement::MerkleQueries(MerkleQueries {
-                merkle_tree: current_merkle_tree,
-                num_openings: self.final_queries,
-            })],
+            proof_elements: vec![
+                ProofElement::FieldElements(FieldElements {
+                    field: self.ldt_parameters.field,
+                    num_elements: self.final_log_degree,
+                    is_extension: true,
+                }),
+                ProofElement::MerkleQueries(MerkleQueries {
+                    merkle_tree: current_merkle_tree,
+                    num_openings: self.final_queries,
+                }),
+            ],
         });
 
         Proof(proof)
