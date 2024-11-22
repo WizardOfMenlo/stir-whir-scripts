@@ -194,10 +194,8 @@ impl StirConfig {
             final_log_inv_rate: log_inv_rate,
         }
     }
-}
 
-impl Display for StirConfig {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn print_config_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.ldt_parameters.fmt(f)?;
         writeln!(
             f,
@@ -220,6 +218,10 @@ impl Display for StirConfig {
             self.final_queries, self.final_log_inv_rate, self.final_pow_bits,
         )?;
 
+        Ok(())
+    }
+
+    fn print_rbr_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "------------------------------------")?;
         writeln!(f, "Round by round soundness analysis:")?;
         writeln!(f, "------------------------------------")?;
@@ -304,6 +306,13 @@ impl Display for StirConfig {
         )?;
 
         Ok(())
+    }
+}
+
+impl Display for StirConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.print_config_summary(f)?;
+        self.print_rbr_summary(f)
     }
 }
 
