@@ -147,7 +147,13 @@ impl MerkleQueries {
     }
 
     fn copath_size(&self) -> usize {
-        self.num_openings * self.merkle_tree.leaf.size_bits()
+        // We either reveal the leaf or its digest, depending on which is shorter
+        self.num_openings
+            * self
+                .merkle_tree
+                .leaf
+                .size_bits()
+                .min(self.merkle_tree.digest_size)
             + self.copath_elements() * self.merkle_tree.digest_size
     }
 
