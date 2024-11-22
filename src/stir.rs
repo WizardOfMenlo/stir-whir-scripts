@@ -381,7 +381,8 @@ impl StirConfig {
 impl Display for StirConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.print_config_summary(f)?;
-        self.print_rbr_summary(f)
+        self.print_rbr_summary(f);
+        writeln!(f, "{}", self.build_proof())
     }
 }
 
