@@ -152,7 +152,7 @@ impl StirConfig {
             // Now compute the PoW
             let pow_bits = pow_util(
                 security_level,
-                query_error.max(prox_gaps_error_1).max(prox_gaps_error_2),
+                query_error.min(prox_gaps_error_1).min(prox_gaps_error_2),
             );
 
             let round_config = RoundConfig {
@@ -264,11 +264,17 @@ impl StirConfig {
     }
 
     fn print_config_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.ldt_parameters.fmt(f)?;
+        writeln!(f, "{}", self.ldt_parameters)?;
         writeln!(
             f,
             "Security level: {} bits using {} security and {} bits of PoW",
             self.security_level, self.security_assumption, self.max_pow_bits
+        )?;
+
+        writeln!(
+            f,
+            "Initial domain size: 2^{}, initial rate 2^-{}",
+            self.starting_domain_log_size, self.starting_log_inv_rate,
         )?;
 
         writeln!(
