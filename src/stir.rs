@@ -250,7 +250,7 @@ impl StirConfig {
             proof_elements: vec![
                 ProofElement::FieldElements(FieldElements {
                     field: self.ldt_parameters.field,
-                    num_elements: self.final_log_degree,
+                    num_elements: 1 << self.final_log_degree,
                     is_extension: true,
                 }),
                 ProofElement::MerkleQueries(MerkleQueries {
@@ -288,8 +288,8 @@ impl StirConfig {
 
         writeln!(
             f,
-            "final_queries: {}, final_rate: 2^-{}, final_pow_bits: {}",
-            self.final_queries, self.final_log_inv_rate, self.final_pow_bits,
+            "final_queries: {}, final polynomial: {}, final_rate: 2^-{}, final_pow_bits: {}",
+            self.final_queries, self.final_log_degree, self.final_log_inv_rate, self.final_pow_bits,
         )?;
 
         Ok(())
