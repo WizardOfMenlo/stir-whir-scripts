@@ -204,7 +204,7 @@ impl StirConfig {
             self.starting_domain_log_size - self.starting_folding_factor,
             self.ldt_parameters.field,
             (1 << self.starting_folding_factor) * self.ldt_parameters.batch_size,
-            true,
+            false, // First tree is over the base
         );
 
         let mut proof = Vec::with_capacity(self.round_parameters.len() + 1);
