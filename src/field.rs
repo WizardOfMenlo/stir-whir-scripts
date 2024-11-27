@@ -14,7 +14,7 @@ pub const GOLDILOCKS_2: Field = Field {
 };
 
 pub const BABYBEAR_5: Field = Field {
-    name: "Goldilocks",
+    name: "Babybear",
     field_size_bits: 27,
     extension_degree: 5,
 };

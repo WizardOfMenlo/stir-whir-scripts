@@ -1,6 +1,7 @@
 use stir_whir_estimation::{
     errors::SecurityAssumption,
-    field::GOLDILOCKS_2,
+    //field::GOLDILOCKS_2,
+    field::BABYBEAR_5,
     fri::{FriConfig, FriParameters},
     stir::{StirConfig, StirParameters},
     LowDegreeParameters,
@@ -8,7 +9,7 @@ use stir_whir_estimation::{
 
 fn main() {
     let ldt_parameters = LowDegreeParameters {
-        field: GOLDILOCKS_2,
+        field: BABYBEAR_5,
         log_degree: 30,
         batch_size: 10,
     };
