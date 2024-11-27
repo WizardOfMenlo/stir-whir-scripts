@@ -13,6 +13,12 @@ pub const GOLDILOCKS_2: Field = Field {
     extension_degree: 2,
 };
 
+pub const BABYBEAR_5: Field = Field {
+    name: "Goldilocks",
+    field_size_bits: 27,
+    extension_degree: 5,
+};
+
 impl Field {
     pub fn extension_bit_size(&self) -> usize {
         self.extension_degree * self.field_size_bits

@@ -14,11 +14,55 @@ pub struct StirParameters {
 
     // The following relate only to the internal rounds
     pub folding_factors: Vec<usize>,
-    pub evaluation_domain_log_sizes: Vec<usize>,
+    pub log_inv_rates: Vec<usize>,
 
     pub security_assumption: SecurityAssumption,
     pub security_level: usize,
     pub pow_bits: usize,
+}
+
+impl StirParameters {
+    // This is basically a worse FRI (no domain shifting but we use OOD samples and quotients)
+    pub fn fixed_rate_folding(
+        log_inv_rate: usize,
+        folding_factor: usize,
+        num_rounds: usize,
+        security_assumption: SecurityAssumption,
+        security_level: usize,
+        pow_bits: usize,
+    ) -> Self {
+        StirParameters {
+            starting_log_inv_rate: log_inv_rate,
+            starting_folding_factor: folding_factor,
+            folding_factors: vec![folding_factor; num_rounds],
+            log_inv_rates: vec![log_inv_rate; num_rounds],
+            security_assumption,
+            security_level,
+            pow_bits,
+        }
+    }
+
+    // This is basically the version in the paper
+    pub fn fixed_domain_shift(
+        log_inv_rate: usize,
+        folding_factor: usize,
+        num_rounds: usize,
+        security_assumption: SecurityAssumption,
+        security_level: usize,
+        pow_bits: usize,
+    ) -> Self {
+        StirParameters {
+            starting_log_inv_rate: log_inv_rate,
+            starting_folding_factor: folding_factor,
+            folding_factors: vec![folding_factor; num_rounds],
+            log_inv_rates: (0..num_rounds)
+                .map(|i| log_inv_rate + (i + 1) * (folding_factor - 1))
+                .collect(),
+            security_assumption,
+            security_level,
+            pow_bits,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -65,7 +109,7 @@ impl StirConfig {
         );
         assert_eq!(
             stir_parameters.folding_factors.len(),
-            stir_parameters.evaluation_domain_log_sizes.len()
+            stir_parameters.log_inv_rates.len()
         );
 
         // We cannot fold too much
@@ -107,13 +151,13 @@ impl StirConfig {
 
         let mut round_parameters = Vec::with_capacity(num_rounds);
 
-        for (folding_factor, new_evaluation_domain_size) in stir_parameters
+        for (folding_factor, next_rate) in stir_parameters
             .folding_factors
             .into_iter()
-            .zip(stir_parameters.evaluation_domain_log_sizes)
+            .zip(stir_parameters.log_inv_rates)
         {
-            // This is the rate of the codeword g
-            let next_rate = new_evaluation_domain_size - current_log_degree;
+            // This is the size of the new evaluation domain
+            let new_evaluation_domain_size = current_log_degree + next_rate;
 
             // Compute the ood samples required
             let ood_samples = stir_parameters.security_assumption.ood_samples(

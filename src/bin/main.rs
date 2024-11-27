@@ -1,5 +1,7 @@
 use stir_whir_estimation::{
+    errors::SecurityAssumption,
     field::GOLDILOCKS_2,
+    fri::{FriConfig, FriParameters},
     stir::{StirConfig, StirParameters},
     LowDegreeParameters,
 };
@@ -7,22 +9,18 @@ use stir_whir_estimation::{
 fn main() {
     let ldt_parameters = LowDegreeParameters {
         field: GOLDILOCKS_2,
-        log_degree: 20,
-        batch_size: 1,
+        log_degree: 30,
+        batch_size: 10,
     };
 
-    let stir_parameters = StirParameters {
-        starting_log_inv_rate: 1,
-        starting_folding_factor: 4,
-        folding_factors: vec![4, 4, 4, 4],
-        evaluation_domain_log_sizes: vec![20, 19, 18, 17],
-
-        security_assumption: stir_whir_estimation::errors::SecurityAssumption::CapacityBound,
-        security_level: 100,
-        pow_bits: 20,
-    };
-
+    let stir_parameters =
+        StirParameters::fixed_domain_shift(1, 4, 4, SecurityAssumption::CapacityBound, 100, 20);
     let stir_config = StirConfig::new(ldt_parameters, stir_parameters);
 
+    let fri_parameters =
+        FriParameters::fixed_folding(1, 4, 4, SecurityAssumption::CapacityBound, 100, 20);
+    let fri_config = FriConfig::new(ldt_parameters, fri_parameters);
+
     println!("{}", stir_config);
+    println!("{}", fri_config);
 }

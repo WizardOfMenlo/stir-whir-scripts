@@ -128,7 +128,7 @@ impl MerkleTree {
                 is_extension,
             },
             tree_depth,
-            digest_size: 256,
+            digest_size: 256, // TODO: We might change this based on security level
         }
     }
 }
