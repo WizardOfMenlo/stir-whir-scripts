@@ -31,7 +31,7 @@ impl SecurityAssumption {
         // I joke, I actually know but this is left for posterity.
         match self {
             // We don't use eta in UD
-            Self::UniqueDecoding => 0.,
+            Self::UniqueDecoding => 0., // TODO: Maybe just panic and avoid calling it in UD?
             // Set as sqrt(rho)/20
             Self::JohnsonBound => -(0.5 * log_inv_rate as f64 + LOG2_10 + 1.),
             // Set as rho/2
@@ -65,19 +65,33 @@ impl SecurityAssumption {
         field_size_bits: usize,
         folding_factor: usize,
     ) -> f64 {
+        // The error computed here is from [BCIKS20] for the combination of two functions. Then we multiply it by the folding factor.
         let log_eta = self.log_eta(log_inv_rate);
         let error = match self {
-            Self::CapacityBound => (log_degree + log_inv_rate) as f64 - log_eta,
-            Self::JohnsonBound => LOG2_10 + 3.5 * log_inv_rate as f64 + 2. * log_degree as f64,
+            // In UD the error is |L|/|F| = d/rate*|F|
             Self::UniqueDecoding => (log_degree + log_inv_rate) as f64,
+
+            // In JB the error is degree^2/|F| * (2 * min{ 1 - sqrt(rho) - delta, sqrt(rho)/20 })^7
+            // Since delta = 1 - sqrt(rho) - eta then 1 - sqrt(rho) - delta = eta
+            // Thus the error is degree^2/|F| * (2 * min { eta, sqrt(rho)/20 })^7
+            // TODO: Double check later on.
+            Self::JohnsonBound => {
+                let numerator = (2 * log_degree) as f64;
+                let right = LOG2_10 + 3.5 * log_inv_rate as f64;
+                numerator + right.min(log_eta) - 1.
+            }
+
+            // In JB we assume the error is degree/eta*rate^2
+            Self::CapacityBound => (log_degree + 2 * log_inv_rate) as f64 - log_eta,
         };
 
-        // TODO: The folding_factor is not exactly correct
+        // TODO: The folding_factor is not exactly correct (should be -1 (also is this in bits? Check in callsite))
         field_size_bits as f64 - (error + folding_factor as f64)
     }
 
     /// Compute a number of queries to match the security level
     pub fn queries(&self, protocol_security_level: usize, log_inv_rate: usize) -> usize {
+        // TODO: This is discounting the effect of eta.
         let num_queries_f = match self {
             Self::UniqueDecoding => {
                 let rate = 1. / ((1 << log_inv_rate) as f64);
