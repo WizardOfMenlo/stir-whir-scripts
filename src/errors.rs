@@ -1,9 +1,19 @@
 use std::{f64::consts::LOG2_10, fmt::Display, str::FromStr};
 
+/// Security assumptions determines which proximity parameters and conjectures are assumed by the error computation.
 #[derive(Debug, Clone, Copy)]
 pub enum SecurityAssumption {
+    /// Unique decoding assumes that the distance of each oracle is within the UDR of the code.
+    /// This requires no conjectures neither in STIR nor WHIR.
     UniqueDecoding,
+
+    /// Johnson bound assumes that the distance of each oracle is within the Johnson bound (1 - sqrt(rho)).
+    /// In STIR, this requires no conjecture.
+    /// In WHIR, this assumes that RS have mutual correlated agreement for proximity parameter up to (1 - sqrt(rho)).
     JohnsonBound,
+
+    /// Capacity bound assumes that the distance of each oracle is within the capacity bound 1 - rho.
+    /// In both STIR and WHIR this requires conjecturing that RS codes are decodable up to capacity and have correlated agreement (mutual in WHIR) up to capacity.
     CapacityBound,
 }
 
