@@ -4,40 +4,56 @@ use std::{f64::consts::LOG2_10, fmt::Display, str::FromStr};
 #[derive(Debug, Clone, Copy)]
 pub enum SecurityAssumption {
     /// Unique decoding assumes that the distance of each oracle is within the UDR of the code.
+    /// We refer to this configuration as UD for short.
     /// This requires no conjectures neither in STIR nor WHIR.
     UniqueDecoding,
 
     /// Johnson bound assumes that the distance of each oracle is within the Johnson bound (1 - sqrt(rho)).
+    /// We refer to this configuration as JB for short.
     /// In STIR, this requires no conjecture.
     /// In WHIR, this assumes that RS have mutual correlated agreement for proximity parameter up to (1 - sqrt(rho)).
     JohnsonBound,
 
     /// Capacity bound assumes that the distance of each oracle is within the capacity bound 1 - rho.
+    /// We refer to this configuration as CB for short.
     /// In both STIR and WHIR this requires conjecturing that RS codes are decodable up to capacity and have correlated agreement (mutual in WHIR) up to capacity.
     CapacityBound,
 }
 
 impl SecurityAssumption {
-    /// Given a rate, computes a suitable eta to use
+    /// In both JB and CB theorems such as list-size only hold for proximity parameters slighly below the bound.
+    /// E.g. in JB proximity gaps holds for every delta \in (0, 1 - sqrt(rho)).
+    /// Eta is the distance between the chosen proximity parameter and the bound.
+    /// I.e. in JB delta = 1 - sqrt(rho) - eta and in CB delta = 1 - rho - eta.
+    // TODO: Maybe it makes more sense to be multiplicative. I think this can be set in a better way.
     pub fn log_eta(&self, log_inv_rate: usize) -> f64 {
         // Ask me how I did this? At the time, only God and I knew. Now only God knows
+        // I joke, I actually know but this is left for posterity.
         match self {
+            // We don't use eta in UD
             Self::UniqueDecoding => 0.,
+            // Set as sqrt(rho)/20
             Self::JohnsonBound => -(0.5 * log_inv_rate as f64 + LOG2_10 + 1.),
+            // Set as rho/2
+            // TODO: We should improve this.
             Self::CapacityBound => -(log_inv_rate as f64 + 1.),
         }
     }
 
-    /// Given a RS code (specified by the log of the degree and log inv of the rate), compute the list size at the specified distance.
+    /// Given a RS code (specified by the log of the degree and log inv of the rate), compute the list size at the specified distance delta.
     pub fn list_size_bits(&self, log_degree: usize, log_inv_rate: usize) -> f64 {
         let log_eta = self.log_eta(log_inv_rate);
         match self {
+            // In UD the list size is 1
             Self::UniqueDecoding => 0.,
-            Self::CapacityBound => (log_degree + log_inv_rate) as f64 - log_eta,
+
+            // By the JB, RS codes are (1 - sqrt(rho) - eta, (2*eta*sqrt(rho))^-1)-list decodable.
             Self::JohnsonBound => {
                 let log_inv_sqrt_rate: f64 = log_inv_rate as f64 / 2.;
                 log_inv_sqrt_rate - (1. + log_eta)
             }
+            // In CB we assume that RS codes are (1 - rho - eta, d/rho*eta)-list decodable (see Conjecture 5.6 in STIR).
+            Self::CapacityBound => (log_degree + log_inv_rate) as f64 - log_eta,
         }
     }
 
