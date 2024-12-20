@@ -74,11 +74,10 @@ impl SecurityAssumption {
             // In JB the error is degree^2/|F| * (2 * min{ 1 - sqrt(rho) - delta, sqrt(rho)/20 })^7
             // Since delta = 1 - sqrt(rho) - eta then 1 - sqrt(rho) - delta = eta
             // Thus the error is degree^2/|F| * (2 * min { eta, sqrt(rho)/20 })^7
-            // TODO: Double check later on.
             Self::JohnsonBound => {
                 let numerator = (2 * log_degree) as f64;
-                let right = LOG2_10 + 3.5 * log_inv_rate as f64;
-                numerator + right.min(log_eta) - 1.
+                let sqrt_rho_20 = LOG2_10 + 0.5 * log_inv_rate as f64;
+                numerator + 7. * (sqrt_rho_20.min(log_eta) - 1.)
             }
 
             // In JB we assume the error is degree/eta*rate^2
