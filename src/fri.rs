@@ -6,21 +6,35 @@ use crate::{
     LowDegreeParameters,
 };
 
+/// Parameters parametrizing an instance of FRI.
+/// This does not include the entire configuration of FRI, as we populate that later on according to required security config.
 #[derive(Clone)]
 pub struct FriParameters {
-    // Relate to the first round
+    /// The starting rate used in the protocol.
     pub starting_log_inv_rate: usize,
+
+    /// The folding factor in the first round.
+    /// Given in log form, i.e. starting_folding_factor = 2 implies that the degree is reduced by a factor of 4.
     pub starting_folding_factor: usize,
 
-    // The following relate only to the internal rounds
+    /// The folding factors in the remaining rounds.
+    /// Given in log form, i.e. folding_factors[i] = 2 implies that the degree in round i is reduced by a factor of 4.
     pub folding_factors: Vec<usize>,
 
+    /// The security assumption under which to configure FRI.
     pub security_assumption: SecurityAssumption,
+
+    /// The security level desired.
     pub security_level: usize,
+
+    /// The number of pow bits to use to reduce query error.
+    /// Traditionally called also "grinding".
+    /// NOTE: This does not affect the pow bits used to reduce proximity gaps errors.
     pub pow_bits: usize,
 }
 
 impl FriParameters {
+    /// Instantiate a FRI configuration where each round does a fixed amount of folding.
     pub fn fixed_folding(
         log_inv_rate: usize,
         folding_factor: usize,
@@ -40,34 +54,53 @@ impl FriParameters {
     }
 }
 
+/// A fully expanded FRI configuration.
 #[derive(Clone)]
 pub struct FriConfig {
-    pub(crate) ldt_parameters: LowDegreeParameters,
-    pub(crate) security_assumption: SecurityAssumption,
-    pub(crate) security_level: usize,
-    pub(crate) max_pow_bits: usize,
+    /// The configuration for the LDT desired.
+    pub ldt_parameters: LowDegreeParameters,
 
-    pub(crate) starting_folding_factor: usize,
-    pub(crate) starting_domain_log_size: usize,
-    pub(crate) log_inv_rate: usize,
-    pub(crate) starting_folding_pow_bits: f64,
+    /// The security assumption under which FRI was configured.
+    pub security_assumption: SecurityAssumption,
 
-    pub(crate) round_parameters: Vec<RoundConfig>,
+    /// The desired security level.
+    pub security_level: usize,
 
-    pub(crate) final_log_degree: usize,
-    pub(crate) queries: usize,
-    pub(crate) pow_bits: f64,
+    /// The maximum number of pow bits allowed (over and we throw a warning, as probably then we are misconfigured.)
+    pub max_pow_bits: usize,
+
+    /// The rate of the RS codes used during the protocol.    
+    pub log_inv_rate: usize,
+
+    /// The initial folding factor.
+    pub starting_folding_factor: usize,
+    /// The initial domain size
+    pub starting_domain_log_size: usize,
+    /// The initial pow bits used in the first fold.
+    pub starting_folding_pow_bits: f64,
+
+    /// The round-specific parameters.
+    pub round_parameters: Vec<RoundConfig>,
+
+    /// Degree of the final polynomial sent over.
+    pub final_poly_log_degree: usize,
+
+    /// Number of FRI queries
+    pub queries: usize,
+
+    /// Number of bits of proof of work (for the queries).
+    pub pow_bits: f64,
 }
 
+/// Round specific configuration
 #[derive(Debug, Clone)]
-pub(crate) struct RoundConfig {
-    pub(crate) evaluation_domain_log_size: usize,
-    pub(crate) folding_factor: usize,
-    pub(crate) folding_pow_bits: f64,
-}
-
-fn pow_util(security_level: usize, error: f64) -> f64 {
-    0f64.max(security_level as f64 - error)
+pub struct RoundConfig {
+    /// Folding factor for this round.
+    pub folding_factor: usize,
+    /// Size of evaluation domain.
+    pub evaluation_domain_log_size: usize,
+    /// Number of folding pow_bits.
+    pub folding_pow_bits: f64,
 }
 
 impl FriConfig {
@@ -166,7 +199,7 @@ impl FriConfig {
             round_parameters,
             queries: final_queries,
             pow_bits: final_pow_bits,
-            final_log_degree,
+            final_poly_log_degree: final_log_degree,
         }
     }
 
@@ -216,7 +249,7 @@ impl FriConfig {
 
         final_round.push(ProofElement::FieldElements(FieldElements {
             field: self.ldt_parameters.field,
-            num_elements: 1 << self.final_log_degree,
+            num_elements: 1 << self.final_poly_log_degree,
             is_extension: true,
         }));
 
@@ -255,7 +288,7 @@ impl FriConfig {
         writeln!(
             f,
             "final_queries: {}, final polynomial: {}",
-            self.queries, self.final_log_degree,
+            self.queries, self.final_poly_log_degree,
         )?;
 
         Ok(())
@@ -334,4 +367,8 @@ impl Display for RoundConfig {
             self.folding_factor, self.evaluation_domain_log_size, self.folding_pow_bits,
         )
     }
+}
+
+fn pow_util(security_level: usize, error: f64) -> f64 {
+    0f64.max(security_level as f64 - error)
 }
