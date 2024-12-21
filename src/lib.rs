@@ -17,8 +17,11 @@ pub fn default_max_pow(num_variables: usize, log_inv_rate: usize) -> usize {
 /// The parameters for a (batched) low-degree test.
 #[derive(Debug, Clone, Copy)]
 pub struct LowDegreeParameters {
+    /// The field the low degree test is over
     pub field: Field,
+    /// The degree to be test
     pub log_degree: usize,
+    /// How many functions are tested (NOTE: not in log form)
     pub batch_size: usize,
 }
 
