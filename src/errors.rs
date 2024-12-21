@@ -34,9 +34,8 @@ impl SecurityAssumption {
             Self::UniqueDecoding => 0., // TODO: Maybe just panic and avoid calling it in UD?
             // Set as sqrt(rho)/20
             Self::JohnsonBound => -(0.5 * log_inv_rate as f64 + LOG2_10 + 1.),
-            // Set as rho/2
-            // TODO: We should improve this.
-            Self::CapacityBound => -(log_inv_rate as f64 + 1.),
+            // Set as rho/20
+            Self::CapacityBound => -(log_inv_rate as f64 + LOG2_10 + 1.),
         }
     }
 
@@ -194,6 +193,7 @@ mod tests {
     fn test_ud_errors() {
         let assumption = SecurityAssumption::UniqueDecoding;
 
+        // Setting
         let log_degree = 20;
         let degree = (1 << log_degree) as f64;
         let log_inv_rate = 2;
@@ -201,13 +201,14 @@ mod tests {
 
         let field_size_bits = 128;
 
+        // List size
+        assert_eq!(assumption.list_size_bits(log_degree, log_inv_rate), 0.);
+
+        // Prox gaps
         let computed_error =
             assumption.prox_gaps_error(log_degree, log_inv_rate, field_size_bits, 1);
         let real_error_non_log = degree / rate;
         let real_error = field_size_bits as f64 - real_error_non_log.log2();
-
-        dbg!(computed_error);
-        dbg!(real_error);
 
         assert!((computed_error - real_error).abs() < 0.01);
     }
@@ -216,6 +217,7 @@ mod tests {
     fn test_jb_errors() {
         let assumption = SecurityAssumption::JohnsonBound;
 
+        // Setting
         let log_degree = 20;
         let degree = (1 << log_degree) as f64;
         let log_inv_rate = 2;
@@ -226,14 +228,45 @@ mod tests {
 
         let field_size_bits = 128;
 
+        // List size
+        let real_list_size = 1. / (2. * eta * rate.sqrt());
+        let computed_list_size = assumption.list_size_bits(log_degree, log_inv_rate);
+        assert!((real_list_size.log2() - computed_list_size).abs() < 0.01);
+
+        // Prox gaps
         let computed_error =
             assumption.prox_gaps_error(log_degree, log_inv_rate, field_size_bits, 1);
         let real_error_non_log =
             degree.powi(2) / (2. * (rate.sqrt() / 20.).min(1. - rate.sqrt() - delta)).powi(7);
         let real_error = field_size_bits as f64 - real_error_non_log.log2();
 
-        dbg!(computed_error);
-        dbg!(real_error);
+        assert!((computed_error - real_error).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_cb_errors() {
+        let assumption = SecurityAssumption::CapacityBound;
+
+        // Setting
+        let log_degree = 20;
+        let degree = (1 << log_degree) as f64;
+        let log_inv_rate = 2;
+        let rate = 1. / (1 << log_inv_rate) as f64;
+
+        let eta = rate / 20.;
+
+        let field_size_bits = 128;
+
+        // List size
+        let real_list_size = degree / (rate * eta);
+        let computed_list_size = assumption.list_size_bits(log_degree, log_inv_rate);
+        assert!((dbg!(real_list_size.log2()) - dbg!(computed_list_size)).abs() < 0.01);
+
+        // Prox gaps
+        let computed_error =
+            assumption.prox_gaps_error(log_degree, log_inv_rate, field_size_bits, 1);
+        let real_error_non_log = degree / (eta * rate.powi(2));
+        let real_error = field_size_bits as f64 - real_error_non_log.log2();
 
         assert!((computed_error - real_error).abs() < 0.01);
     }
