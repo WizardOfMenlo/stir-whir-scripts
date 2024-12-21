@@ -67,6 +67,7 @@ impl SecurityAssumption {
     ) -> f64 {
         // The error computed here is from [BCIKS20] for the combination of two functions. Then we multiply it by the folding factor.
         let log_eta = self.log_eta(log_inv_rate);
+        // Note that this does not include the field_size
         let error = match self {
             // In UD the error is |L|/|F| = d/rate*|F|
             Self::UniqueDecoding => (log_degree + log_inv_rate) as f64,
@@ -74,19 +75,19 @@ impl SecurityAssumption {
             // In JB the error is degree^2/|F| * (2 * min{ 1 - sqrt(rho) - delta, sqrt(rho)/20 })^7
             // Since delta = 1 - sqrt(rho) - eta then 1 - sqrt(rho) - delta = eta
             // Thus the error is degree^2/|F| * (2 * min { eta, sqrt(rho)/20 })^7
-            // TODO: Not convinced will do a pass tomorrow
             Self::JohnsonBound => {
                 let numerator = (2 * log_degree) as f64;
-                let sqrt_rho_20 = LOG2_10 + 0.5 * log_inv_rate as f64;
-                numerator + 7. * (sqrt_rho_20.min(log_eta) - 1.)
+                let sqrt_rho_20 = 1. + LOG2_10 + 0.5 * log_inv_rate as f64;
+                numerator + 7. * (sqrt_rho_20.min(-log_eta) - 1.)
             }
 
             // In JB we assume the error is degree/eta*rate^2
             Self::CapacityBound => (log_degree + 2 * log_inv_rate) as f64 - log_eta,
         };
 
-        // TODO: The folding_factor is not exactly correct (should be -1 (also is this in bits? Check in callsite))
-        field_size_bits as f64 - (error + folding_factor as f64)
+        // Error is  (2**folding_factor - 1) * error/|F|;
+        let folding_factor_1_log = (((1 << folding_factor) - 1) as f64).log2();
+        field_size_bits as f64 - (error + folding_factor_1_log as f64)
     }
 
     /// Compute a number of queries to match the security level
@@ -182,5 +183,58 @@ impl FromStr for SecurityAssumption {
         } else {
             Err(format!("Invalid soundness specification: {}", s))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SecurityAssumption;
+
+    #[test]
+    fn test_ud_errors() {
+        let assumption = SecurityAssumption::UniqueDecoding;
+
+        let log_degree = 20;
+        let degree = (1 << log_degree) as f64;
+        let log_inv_rate = 2;
+        let rate = 1. / (1 << log_inv_rate) as f64;
+
+        let field_size_bits = 128;
+
+        let computed_error =
+            assumption.prox_gaps_error(log_degree, log_inv_rate, field_size_bits, 1);
+        let real_error_non_log = degree / rate;
+        let real_error = field_size_bits as f64 - real_error_non_log.log2();
+
+        dbg!(computed_error);
+        dbg!(real_error);
+
+        assert!((computed_error - real_error).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_jb_errors() {
+        let assumption = SecurityAssumption::JohnsonBound;
+
+        let log_degree = 20;
+        let degree = (1 << log_degree) as f64;
+        let log_inv_rate = 2;
+        let rate = 1. / (1 << log_inv_rate) as f64;
+
+        let eta = rate.sqrt() / 20.;
+        let delta = 1. - rate.sqrt() - eta;
+
+        let field_size_bits = 128;
+
+        let computed_error =
+            assumption.prox_gaps_error(log_degree, log_inv_rate, field_size_bits, 1);
+        let real_error_non_log =
+            degree.powi(2) / (2. * (rate.sqrt() / 20.).min(1. - rate.sqrt() - delta)).powi(7);
+        let real_error = field_size_bits as f64 - real_error_non_log.log2();
+
+        dbg!(computed_error);
+        dbg!(real_error);
+
+        assert!((computed_error - real_error).abs() < 0.01);
     }
 }
