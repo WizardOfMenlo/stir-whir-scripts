@@ -72,6 +72,9 @@ pub struct FriConfig {
     /// The rate of the RS codes used during the protocol.    
     pub log_inv_rate: usize,
 
+    /// The pow bits used in the batching phase.
+    pub batching_pow_bits: f64,
+
     /// The initial folding factor.
     pub starting_folding_factor: usize,
     /// The initial domain size
@@ -135,6 +138,21 @@ impl FriConfig {
         let starting_domain_log_size =
             ldt_parameters.log_degree + fri_parameters.starting_log_inv_rate;
 
+        let batching_pow_bits = if ldt_parameters.batch_size > 1 {
+            // We now start, the initial folding pow bits
+            pow_util(
+                security_level,
+                fri_parameters.security_assumption.prox_gaps_error(
+                    ldt_parameters.log_degree,
+                    fri_parameters.starting_log_inv_rate,
+                    ldt_parameters.field.extension_bit_size(),
+                    ldt_parameters.batch_size.ilog2() as usize, // TODO: This is not correct
+                ),
+            )
+        } else {
+            0.
+        };
+
         // Degree of next polynomial to send
         let mut current_log_degree = ldt_parameters.log_degree - starting_folding_factor;
 
@@ -193,6 +211,7 @@ impl FriConfig {
             security_assumption: fri_parameters.security_assumption,
             security_level,
             max_pow_bits: fri_parameters.pow_bits,
+            batching_pow_bits,
             starting_folding_factor,
             starting_domain_log_size,
             log_inv_rate: fri_parameters.starting_log_inv_rate,
@@ -280,6 +299,14 @@ impl FriConfig {
             self.starting_domain_log_size, self.log_inv_rate, self.queries, self.pow_bits
         )?;
 
+        if self.ldt_parameters.batch_size > 1 {
+            writeln!(
+                f,
+                "Batch size: {}, batching_pow_bits: {:.1}",
+                self.ldt_parameters.batch_size, self.batching_pow_bits
+            )?;
+        }
+
         writeln!(
             f,
             "Initial folding factor: {}, initial_folding_pow_bits: {:.1}",
@@ -298,11 +325,31 @@ impl FriConfig {
         Ok(())
     }
 
+    /// Displays the round-by-error analysis for the protocol.
     pub fn print_rbr_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "------------------------------------")?;
         writeln!(f, "Round by round soundness analysis:")?;
         writeln!(f, "------------------------------------")?;
 
+        // The batching error.
+        if self.ldt_parameters.batch_size > 1 {
+            let batching_prox_gaps_error = self.security_assumption.prox_gaps_error(
+                self.ldt_parameters.log_degree,
+                self.log_inv_rate,
+                self.ldt_parameters.field.extension_bit_size(),
+                self.ldt_parameters.batch_size.ilog2() as usize, // TODO: This is not really right
+            );
+
+            writeln!(
+                f,
+                "{:.1} bits -- batch prox gaps: {:.1}, pow: {:.1}",
+                batching_prox_gaps_error + self.batching_pow_bits,
+                batching_prox_gaps_error,
+                self.batching_pow_bits,
+            )?;
+        }
+
+        // We now start running FRI
         let mut current_log_degree = self.ldt_parameters.log_degree - self.starting_folding_factor;
 
         let starting_prox_gaps_error = self.security_assumption.prox_gaps_error(
