@@ -89,35 +89,37 @@ impl SecurityAssumption {
         field_size_bits as f64 - (error + folding_factor_1_log as f64)
     }
 
+    /// The query error is (1 - delta)^t where t is the number of queries.
+    /// This computes log(1 - delta).
+    /// In UD, delta is (1 - rho)/2
+    /// In JB, delta is (1 - sqrt(rho) - eta)
+    /// In CB, delta is (1 - rho - eta)
+    pub fn log_1_delta(&self, log_inv_rate: usize) -> f64 {
+        let log_eta = self.log_eta(log_inv_rate);
+        let eta = 2_f64.powf(log_eta);
+        let rate = 1. / (1 << log_inv_rate) as f64;
+
+        let delta = match self {
+            Self::UniqueDecoding => 0.5 * (1. - rate),
+            Self::JohnsonBound => 1. - rate.sqrt() - eta,
+            Self::CapacityBound => 1. - rate - eta,
+        };
+
+        (1. - delta).log2()
+    }
+
     /// Compute a number of queries to match the security level
     pub fn queries(&self, protocol_security_level: usize, log_inv_rate: usize) -> usize {
-        // TODO: This is discounting the effect of eta.
-        let num_queries_f = match self {
-            Self::UniqueDecoding => {
-                let rate = 1. / ((1 << log_inv_rate) as f64);
-                let denom = (0.5 * (1. + rate)).log2();
-
-                -(protocol_security_level as f64) / denom
-            }
-            Self::JohnsonBound => (2 * protocol_security_level) as f64 / log_inv_rate as f64,
-            Self::CapacityBound => protocol_security_level as f64 / log_inv_rate as f64,
-        };
+        let num_queries_f = -(protocol_security_level as f64) / self.log_1_delta(log_inv_rate);
 
         num_queries_f.ceil() as usize
     }
 
+    /// Compute the error for the given number of queries
     pub fn queries_error(&self, log_inv_rate: usize, num_queries: usize) -> f64 {
         let num_queries = num_queries as f64;
-        match self {
-            Self::UniqueDecoding => {
-                let rate = 1. / ((1 << log_inv_rate) as f64);
-                let denom = -(0.5 * (1. + rate)).log2();
 
-                num_queries * denom
-            }
-            Self::JohnsonBound => num_queries * 0.5 * log_inv_rate as f64,
-            Self::CapacityBound => num_queries * log_inv_rate as f64,
-        }
+        -num_queries * self.log_1_delta(log_inv_rate)
     }
 
     pub fn ood_error(
