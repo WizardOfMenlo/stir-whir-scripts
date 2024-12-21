@@ -122,6 +122,10 @@ impl SecurityAssumption {
         -num_queries * self.log_1_delta(log_inv_rate)
     }
 
+    /// Compute the error for the OOD samples of the protocol
+    /// See Lemma 4.5 in STIR.
+    /// The error is list_size^2 * (degree/field_size_bits)^reps
+    /// NOTE: Here we are discounting the domain size as we assume it is negligible compared to the size of the field.
     pub fn ood_error(
         &self,
         log_degree: usize,
@@ -129,13 +133,20 @@ impl SecurityAssumption {
         field_size_bits: usize,
         ood_samples: usize,
     ) -> f64 {
+        if matches!(self, Self::UniqueDecoding) {
+            return 0.;
+        }
+
         let list_size_bits = self.list_size_bits(log_degree, log_inv_rate);
 
         let error = 2. * list_size_bits + (log_degree * ood_samples) as f64;
         (ood_samples * field_size_bits) as f64 + 1. - error
     }
 
-    pub fn ood_samples(
+    /// Computes the number of OOD samples required to achieve security_level bits of security
+    /// We note that in both STIR and WHIR there are various strategies to set OOD samples.
+    /// In this case, we are just sampling one element from the extension field
+    pub fn determine_ood_samples(
         &self,
         security_level: usize,
         log_degree: usize,
@@ -143,18 +154,18 @@ impl SecurityAssumption {
         field_size_bits: usize,
     ) -> usize {
         if matches!(self, Self::UniqueDecoding) {
-            0
-        } else {
-            for ood_samples in 1..64 {
-                if self.ood_error(log_degree, log_inv_rate, field_size_bits, ood_samples)
-                    >= security_level as f64
-                {
-                    return ood_samples;
-                }
-            }
-
-            panic!("Could not find an appropriate number of OOD samples");
+            return 0;
         }
+
+        for ood_samples in 1..64 {
+            if self.ood_error(log_degree, log_inv_rate, field_size_bits, ood_samples)
+                >= security_level as f64
+            {
+                return ood_samples;
+            }
+        }
+
+        panic!("Could not find an appropriate number of OOD samples");
     }
 }
 
