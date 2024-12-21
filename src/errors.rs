@@ -62,7 +62,7 @@ impl SecurityAssumption {
         log_degree: usize,
         log_inv_rate: usize,
         field_size_bits: usize,
-        folding_factor: usize,
+        num_functions: usize,
     ) -> f64 {
         // The error computed here is from [BCIKS20] for the combination of two functions. Then we multiply it by the folding factor.
         let log_eta = self.log_eta(log_inv_rate);
@@ -84,9 +84,9 @@ impl SecurityAssumption {
             Self::CapacityBound => (log_degree + 2 * log_inv_rate) as f64 - log_eta,
         };
 
-        // Error is  (2**folding_factor - 1) * error/|F|;
-        let folding_factor_1_log = (((1 << folding_factor) - 1) as f64).log2();
-        field_size_bits as f64 - (error + folding_factor_1_log as f64)
+        // Error is  (num_functions - 1) * error/|F|;
+        let num_functions_1_log = (num_functions as f64 - 1.).log2();
+        field_size_bits as f64 - (error + num_functions_1_log as f64)
     }
 
     /// The query error is (1 - delta)^t where t is the number of queries.
@@ -223,7 +223,7 @@ mod tests {
 
         // Prox gaps
         let computed_error =
-            assumption.prox_gaps_error(log_degree, log_inv_rate, field_size_bits, 1);
+            assumption.prox_gaps_error(log_degree, log_inv_rate, field_size_bits, 2);
         let real_error_non_log = degree / rate;
         let real_error = field_size_bits as f64 - real_error_non_log.log2();
 
@@ -252,7 +252,7 @@ mod tests {
 
         // Prox gaps
         let computed_error =
-            assumption.prox_gaps_error(log_degree, log_inv_rate, field_size_bits, 1);
+            assumption.prox_gaps_error(log_degree, log_inv_rate, field_size_bits, 2);
         let real_error_non_log =
             degree.powi(2) / (2. * (rate.sqrt() / 20.).min(1. - rate.sqrt() - delta)).powi(7);
         let real_error = field_size_bits as f64 - real_error_non_log.log2();
@@ -281,7 +281,7 @@ mod tests {
 
         // Prox gaps
         let computed_error =
-            assumption.prox_gaps_error(log_degree, log_inv_rate, field_size_bits, 1);
+            assumption.prox_gaps_error(log_degree, log_inv_rate, field_size_bits, 2);
         let real_error_non_log = degree / (eta * rate.powi(2));
         let real_error = field_size_bits as f64 - real_error_non_log.log2();
 

@@ -187,7 +187,7 @@ impl StirConfig {
                     ldt_parameters.log_degree,
                     stir_parameters.starting_log_inv_rate,
                     ldt_parameters.field.extension_bit_size(),
-                    ldt_parameters.batch_size.ilog2() as usize, // TODO: This is not correct
+                    ldt_parameters.batch_size,
                 ),
             )
         } else {
@@ -205,7 +205,7 @@ impl StirConfig {
                 current_log_degree,
                 log_inv_rate,
                 ldt_parameters.field.extension_bit_size(),
-                starting_folding_factor,
+                1 << starting_folding_factor,
             ),
         );
 
@@ -242,15 +242,14 @@ impl StirConfig {
                 current_log_degree,
                 next_rate,
                 ldt_parameters.field.extension_bit_size(),
-                (num_terms as f64).log2().ceil() as usize, // We want this in log
-                                                           // form
+                num_terms,
             );
 
             let prox_gaps_error_2 = stir_parameters.security_assumption.prox_gaps_error(
                 current_log_degree - folding_factor,
                 next_rate,
                 ldt_parameters.field.extension_bit_size(),
-                folding_factor,
+                1 << folding_factor,
             );
 
             // Now compute the PoW
@@ -426,7 +425,7 @@ impl StirConfig {
                 self.ldt_parameters.log_degree,
                 self.starting_log_inv_rate,
                 self.ldt_parameters.field.extension_bit_size(),
-                self.ldt_parameters.batch_size.ilog2() as usize, // TODO: This is not really right
+                self.ldt_parameters.batch_size,
             );
 
             writeln!(
@@ -445,7 +444,7 @@ impl StirConfig {
             current_log_degree,
             log_inv_rate,
             self.ldt_parameters.field.extension_bit_size(),
-            self.starting_folding_factor,
+            1 << self.starting_folding_factor,
         );
 
         writeln!(
@@ -480,15 +479,14 @@ impl StirConfig {
                 current_log_degree,
                 next_rate,
                 self.ldt_parameters.field.extension_bit_size(),
-                ((r.num_queries + r.ood_samples) as f64).log2().ceil() as usize, // We want this in log
-                                                                                 // form
+                r.num_queries + r.ood_samples,
             );
 
             let prox_gaps_error_2 = self.security_assumption.prox_gaps_error(
                 current_log_degree - r.folding_factor,
                 next_rate,
                 self.ldt_parameters.field.extension_bit_size(),
-                r.folding_factor,
+                1 << r.folding_factor,
             );
 
             writeln!(

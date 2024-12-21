@@ -146,7 +146,7 @@ impl FriConfig {
                     ldt_parameters.log_degree,
                     fri_parameters.starting_log_inv_rate,
                     ldt_parameters.field.extension_bit_size(),
-                    ldt_parameters.batch_size.ilog2() as usize, // TODO: This is not correct
+                    ldt_parameters.batch_size,
                 ),
             )
         } else {
@@ -163,7 +163,7 @@ impl FriConfig {
                 current_log_degree,
                 fri_parameters.starting_log_inv_rate,
                 ldt_parameters.field.extension_bit_size(),
-                starting_folding_factor,
+                1 << starting_folding_factor,
             ),
         );
 
@@ -176,7 +176,7 @@ impl FriConfig {
                 current_log_degree - folding_factor,
                 fri_parameters.starting_log_inv_rate,
                 ldt_parameters.field.extension_bit_size(),
-                folding_factor,
+                1 << folding_factor,
             );
 
             // Now compute the PoW
@@ -337,7 +337,7 @@ impl FriConfig {
                 self.ldt_parameters.log_degree,
                 self.log_inv_rate,
                 self.ldt_parameters.field.extension_bit_size(),
-                self.ldt_parameters.batch_size.ilog2() as usize, // TODO: This is not really right
+                self.ldt_parameters.batch_size,
             );
 
             writeln!(
@@ -356,7 +356,7 @@ impl FriConfig {
             current_log_degree,
             self.log_inv_rate,
             self.ldt_parameters.field.extension_bit_size(),
-            self.starting_folding_factor,
+            1 << self.starting_folding_factor,
         );
 
         writeln!(
@@ -372,7 +372,7 @@ impl FriConfig {
                 current_log_degree - r.folding_factor,
                 self.log_inv_rate,
                 self.ldt_parameters.field.extension_bit_size(),
-                r.folding_factor,
+                1 << r.folding_factor,
             );
 
             writeln!(
