@@ -108,7 +108,9 @@ impl SecurityAssumption {
         (1. - delta).log2()
     }
 
-    /// Compute a number of queries to match the security level
+    /// Compute the number of queries to match the security level
+    /// The error to drive down is (1-delta)^t < 2^-secparam.
+    /// Where delta is set as in the `log_1_delta` function.
     pub fn queries(&self, protocol_security_level: usize, log_inv_rate: usize) -> usize {
         let num_queries_f = -(protocol_security_level as f64) / self.log_1_delta(log_inv_rate);
 
@@ -116,6 +118,8 @@ impl SecurityAssumption {
     }
 
     /// Compute the error for the given number of queries
+    /// The error to drive down is (1-delta)^t < 2^-secparam.
+    /// Where delta is set as in the `log_1_delta` function.
     pub fn queries_error(&self, log_inv_rate: usize, num_queries: usize) -> f64 {
         let num_queries = num_queries as f64;
 
