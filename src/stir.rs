@@ -160,7 +160,7 @@ impl StirConfig {
             let new_evaluation_domain_size = current_log_degree + next_rate;
 
             // Compute the ood samples required
-            let ood_samples = stir_parameters.security_assumption.ood_samples(
+            let ood_samples = stir_parameters.security_assumption.determine_ood_samples(
                 security_level,
                 current_log_degree,
                 next_rate,
