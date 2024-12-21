@@ -20,6 +20,13 @@ pub const GOLDILOCKS_2: Field = Field {
     extension_degree: 2,
 };
 
+/// The Goldilocks field, using a cubic extension for security
+pub const GOLDILOCKS_3: Field = Field {
+    name: "Goldilocks",
+    field_size_bits: 64,
+    extension_degree: 3,
+};
+
 /// The BabyBear field, using a quintic extension for security
 pub const BABYBEAR_5: Field = Field {
     name: "Babybear",
