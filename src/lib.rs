@@ -7,6 +7,7 @@ pub mod field;
 pub mod fri;
 pub mod proof_size;
 pub mod stir;
+pub(crate) mod utils;
 
 /// This is used to select a default maximum number of PoW, more than that and we
 /// output an error

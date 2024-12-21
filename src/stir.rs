@@ -3,6 +3,7 @@ use std::fmt::Display;
 use crate::{
     errors::SecurityAssumption,
     proof_size::{FieldElements, MerkleQueries, MerkleTree, Proof, ProofElement, ProofRound},
+    utils::pow_util,
     LowDegreeParameters,
 };
 
@@ -535,9 +536,4 @@ impl Display for RoundConfig {
             self.folding_factor, self.evaluation_domain_log_size, self.num_queries, self.log_inv_rate, self.pow_bits, self.ood_samples,
         )
     }
-}
-
-// TODO: Maybe dedup
-fn pow_util(security_level: usize, error: f64) -> f64 {
-    0f64.max(security_level as f64 - error)
 }
