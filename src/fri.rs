@@ -104,6 +104,7 @@ pub struct RoundConfig {
 }
 
 impl FriConfig {
+    /// Given a LDT parameter and some parameters for FRI, populate the config.
     pub fn new(ldt_parameters: LowDegreeParameters, fri_parameters: FriParameters) -> Self {
         // We need to fold at least some time
         assert!(
@@ -203,6 +204,8 @@ impl FriConfig {
         }
     }
 
+    /// Given a configuration, simulate an execution, keeping track of which elements are sent.
+    /// This is used to compute the proof size.
     pub fn build_proof(&self) -> Proof {
         let starting_merkle_tree = MerkleTree::new(
             self.starting_domain_log_size - self.starting_folding_factor,
@@ -262,7 +265,8 @@ impl FriConfig {
         Proof(proof)
     }
 
-    fn print_config_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    /// Prints a summary of the configuration for FRI.
+    pub fn print_config_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}", self.ldt_parameters)?;
         writeln!(
             f,
@@ -272,13 +276,13 @@ impl FriConfig {
 
         writeln!(
             f,
-            "Initial domain size: 2^{}, initial rate 2^-{}, queries: {}, pow_bits: {}",
+            "Initial domain size: 2^{}, initial rate 2^-{}, queries: {}, pow_bits: {:.1}",
             self.starting_domain_log_size, self.log_inv_rate, self.queries, self.pow_bits
         )?;
 
         writeln!(
             f,
-            "Initial folding factor: {}, initial_folding_pow_bits: {}",
+            "Initial folding factor: {}, initial_folding_pow_bits: {:.1}",
             self.starting_folding_factor, self.starting_folding_pow_bits
         )?;
         for r in &self.round_parameters {
@@ -294,7 +298,7 @@ impl FriConfig {
         Ok(())
     }
 
-    fn print_rbr_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    pub fn print_rbr_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "------------------------------------")?;
         writeln!(f, "Round by round soundness analysis:")?;
         writeln!(f, "------------------------------------")?;
@@ -363,7 +367,7 @@ impl Display for RoundConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
-            "Folding factor: {}, domain_size: 2^{}, folding_pow_bits: {}",
+            "Folding factor: {}, domain_size: 2^{}, folding_pow_bits: {:.1}",
             self.folding_factor, self.evaluation_domain_log_size, self.folding_pow_bits,
         )
     }
