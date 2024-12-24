@@ -44,6 +44,7 @@ impl Proof {
     }
 }
 
+/// Converts a number of bits into an appropriate unit.
 fn display_size(bits: usize) -> String {
     if bits == 0 {
         return "0B".to_owned();
@@ -145,14 +146,17 @@ pub struct MerkleQueries {
 }
 
 impl MerkleQueries {
-    fn copath_elements(&self) -> usize {
+    /// Computes the number of copath elements in an authentication path.
+    /// Includes path pruning done to deduplicate and reduce proof size.
+    pub fn copath_elements(&self) -> usize {
         let log_num_openings = (self.num_openings as f64).log2().ceil() as usize;
 
         self.num_openings * (self.merkle_tree.tree_depth - log_num_openings)
     }
 
-    fn copath_size(&self) -> usize {
-        // We either reveal the leaf or its digest, depending on which is shorter
+    /// Computes the size of an authentication path.
+    pub fn copath_size(&self) -> usize {
+        // We either reveal the neighbouring leaf or its digest, depending on which is shorter
         self.num_openings
             * self
                 .merkle_tree
@@ -162,11 +166,13 @@ impl MerkleQueries {
             + self.copath_elements() * self.merkle_tree.digest_size
     }
 
-    fn opening_size(&self) -> usize {
+    /// Compute the size of an opening.
+    pub fn opening_size(&self) -> usize {
         self.num_openings * self.merkle_tree.leaf.size_bits()
     }
 
-    fn estimate_size_bits(&self) -> usize {
+    /// Computes the total size, includes the auth path and the opening.
+    pub fn estimate_size_bits(&self) -> usize {
         self.copath_size() + self.opening_size()
     }
 }
