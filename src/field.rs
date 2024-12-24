@@ -1,18 +1,33 @@
 use std::fmt::Display;
 
+/// Field represents a field that we are working over.
 #[derive(Debug, Clone, Copy)]
 pub struct Field {
+    /// The name of the field for displaying.
     pub name: &'static str,
+
+    /// The size of the base field.
     pub field_size_bits: usize,
+
+    /// The extension degree of the field (where we usually sample challenges from)
     pub extension_degree: usize,
 }
 
+/// The Goldilocks field, using a quadratic extension for security
 pub const GOLDILOCKS_2: Field = Field {
     name: "Goldilocks",
     field_size_bits: 64,
     extension_degree: 2,
 };
 
+/// The Goldilocks field, using a cubic extension for security
+pub const GOLDILOCKS_3: Field = Field {
+    name: "Goldilocks",
+    field_size_bits: 64,
+    extension_degree: 3,
+};
+
+/// The BabyBear field, using a quintic extension for security
 pub const BABYBEAR_5: Field = Field {
     name: "Babybear",
     field_size_bits: 27,

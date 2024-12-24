@@ -1,27 +1,34 @@
-// Misc utilities for computing proof size
+//! Misc utilities for computing proof size
 
 use std::fmt::Display;
 
 use crate::field::Field;
 
+/// A token which is part of the argument string
 #[derive(Debug, Clone, Copy)]
 pub enum ProofElement {
+    /// A Merkle root
     MerkleRoot(MerkleTree),
+    /// A list of queries to the Merkle tree (with corresponding authentication paths and openings)
     MerkleQueries(MerkleQueries),
+    /// A list of field elements
     FieldElements(FieldElements),
 }
 
+/// A proof round contains the `ProofElement`s relating to this round.
 #[derive(Debug, Clone)]
 pub struct ProofRound {
     pub round_number: usize,
     pub proof_elements: Vec<ProofElement>,
 }
 
+/// A proof consists of a list of proof rounds.
 #[derive(Debug, Clone)]
 pub struct Proof(pub Vec<ProofRound>);
 
 impl Proof {
-    fn total_size_bits(&self) -> usize {
+    /// Given a proof, compute the total number of bits.
+    pub fn total_size_bits(&self) -> usize {
         let mut res = 0;
         for r in &self.0 {
             for el in &r.proof_elements {
@@ -37,18 +44,7 @@ impl Proof {
     }
 }
 
-/*
-def convert_size(size_bits):
-    if size_bits == 0:
-        return "0B"
-    size_bytes = size_bits / 8
-    size_name = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
-    i = int(math.floor(math.log(size_bytes, 1024)))
-    p = math.pow(1024, i)
-    s = round(size_bytes / p, 2)
-    return "%s %s" % (s, size_name[i])
-    */
-
+/// Converts a number of bits into an appropriate unit.
 fn display_size(bits: usize) -> String {
     if bits == 0 {
         return "0B".to_owned();
@@ -112,11 +108,17 @@ impl Display for Proof {
     }
 }
 
+/// Represents a Merkle tree
 #[derive(Debug, Clone, Copy)]
 pub struct MerkleTree {
-    leaf: FieldElements,
-    tree_depth: usize,
-    digest_size: usize,
+    /// The elements in the leaf of the tree
+    pub leaf: FieldElements,
+
+    /// How deep the tree is (contains 2^tree_depth elements)
+    pub tree_depth: usize,
+
+    /// How large is the hash digest
+    pub digest_size: usize,
 }
 
 impl MerkleTree {
@@ -133,21 +135,28 @@ impl MerkleTree {
     }
 }
 
+/// Represents the opening to a merkle tree
 #[derive(Debug, Clone, Copy)]
 pub struct MerkleQueries {
+    /// The corresponding tree
     pub merkle_tree: MerkleTree,
+
+    /// How many openings are requested
     pub num_openings: usize,
 }
 
 impl MerkleQueries {
-    fn copath_elements(&self) -> usize {
+    /// Computes the number of copath elements in an authentication path.
+    /// Includes path pruning done to deduplicate and reduce proof size.
+    pub fn copath_elements(&self) -> usize {
         let log_num_openings = (self.num_openings as f64).log2().ceil() as usize;
 
         self.num_openings * (self.merkle_tree.tree_depth - log_num_openings)
     }
 
-    fn copath_size(&self) -> usize {
-        // We either reveal the leaf or its digest, depending on which is shorter
+    /// Computes the size of an authentication path.
+    pub fn copath_size(&self) -> usize {
+        // We either reveal the neighbouring leaf or its digest, depending on which is shorter
         self.num_openings
             * self
                 .merkle_tree
@@ -157,19 +166,27 @@ impl MerkleQueries {
             + self.copath_elements() * self.merkle_tree.digest_size
     }
 
-    fn opening_size(&self) -> usize {
+    /// Compute the size of an opening.
+    pub fn opening_size(&self) -> usize {
         self.num_openings * self.merkle_tree.leaf.size_bits()
     }
 
-    fn estimate_size_bits(&self) -> usize {
+    /// Computes the total size, includes the auth path and the opening.
+    pub fn estimate_size_bits(&self) -> usize {
         self.copath_size() + self.opening_size()
     }
 }
 
+/// Represents a list of field elements
 #[derive(Debug, Clone, Copy)]
 pub struct FieldElements {
+    /// The field used
     pub field: Field,
+
+    /// How many elements (NOTE: not in log form)
     pub num_elements: usize,
+
+    /// Whether these are extension or base field elements
     pub is_extension: bool,
 }
 

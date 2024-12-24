@@ -3,24 +3,39 @@ use std::fmt::Display;
 use crate::{
     errors::SecurityAssumption,
     proof_size::{FieldElements, MerkleQueries, MerkleTree, Proof, ProofElement, ProofRound},
+    utils::pow_util,
     LowDegreeParameters,
 };
 
+/// Parameters parametrizing an instance of FRI.
+/// This does not include the entire configuration of FRI, as we populate that later on according to required security config.
 #[derive(Clone)]
 pub struct FriParameters {
-    // Relate to the first round
+    /// The starting rate used in the protocol.
     pub starting_log_inv_rate: usize,
+
+    /// The folding factor in the first round.
+    /// Given in log form, i.e. starting_folding_factor = 2 implies that the degree is reduced by a factor of 4.
     pub starting_folding_factor: usize,
 
-    // The following relate only to the internal rounds
+    /// The folding factors in the remaining rounds.
+    /// Given in log form, i.e. folding_factors[i] = 2 implies that the degree in round i is reduced by a factor of 4.
     pub folding_factors: Vec<usize>,
 
+    /// The security assumption under which to configure FRI.
     pub security_assumption: SecurityAssumption,
+
+    /// The security level desired.
     pub security_level: usize,
+
+    /// The number of pow bits to use to reduce query error.
+    /// Traditionally called also "grinding".
+    /// NOTE: This does not affect the pow bits used to reduce proximity gaps errors.
     pub pow_bits: usize,
 }
 
 impl FriParameters {
+    /// Instantiate a FRI configuration where each round does a fixed amount of folding.
     pub fn fixed_folding(
         log_inv_rate: usize,
         folding_factor: usize,
@@ -40,37 +55,60 @@ impl FriParameters {
     }
 }
 
+/// A fully expanded FRI configuration.
 #[derive(Clone)]
 pub struct FriConfig {
-    pub(crate) ldt_parameters: LowDegreeParameters,
-    pub(crate) security_assumption: SecurityAssumption,
-    pub(crate) security_level: usize,
-    pub(crate) max_pow_bits: usize,
+    /// The configuration for the LDT desired.
+    pub ldt_parameters: LowDegreeParameters,
 
-    pub(crate) starting_folding_factor: usize,
-    pub(crate) starting_domain_log_size: usize,
-    pub(crate) log_inv_rate: usize,
-    pub(crate) starting_folding_pow_bits: f64,
+    /// The security assumption under which FRI was configured.
+    pub security_assumption: SecurityAssumption,
 
-    pub(crate) round_parameters: Vec<RoundConfig>,
+    /// The desired security level.
+    pub security_level: usize,
 
-    pub(crate) final_log_degree: usize,
-    pub(crate) queries: usize,
-    pub(crate) pow_bits: f64,
+    /// The maximum number of pow bits allowed (over and we throw a warning, as probably then we are misconfigured.)
+    pub max_pow_bits: usize,
+
+    /// The rate of the RS codes used during the protocol.    
+    pub log_inv_rate: usize,
+
+    /// The pow bits used in the batching phase.
+    pub batching_pow_bits: f64,
+
+    /// The initial folding factor.
+    pub starting_folding_factor: usize,
+    /// The initial domain size
+    pub starting_domain_log_size: usize,
+    /// The initial pow bits used in the first fold.
+    pub starting_folding_pow_bits: f64,
+
+    /// The round-specific parameters.
+    pub round_parameters: Vec<RoundConfig>,
+
+    /// Degree of the final polynomial sent over.
+    pub final_poly_log_degree: usize,
+
+    /// Number of FRI queries
+    pub queries: usize,
+
+    /// Number of bits of proof of work (for the queries).
+    pub pow_bits: f64,
 }
 
+/// Round specific configuration
 #[derive(Debug, Clone)]
-pub(crate) struct RoundConfig {
-    pub(crate) evaluation_domain_log_size: usize,
-    pub(crate) folding_factor: usize,
-    pub(crate) folding_pow_bits: f64,
-}
-
-fn pow_util(security_level: usize, error: f64) -> f64 {
-    0f64.max(security_level as f64 - error)
+pub struct RoundConfig {
+    /// Folding factor for this round.
+    pub folding_factor: usize,
+    /// Size of evaluation domain.
+    pub evaluation_domain_log_size: usize,
+    /// Number of folding pow_bits.
+    pub folding_pow_bits: f64,
 }
 
 impl FriConfig {
+    /// Given a LDT parameter and some parameters for FRI, populate the config.
     pub fn new(ldt_parameters: LowDegreeParameters, fri_parameters: FriParameters) -> Self {
         // We need to fold at least some time
         assert!(
@@ -101,6 +139,21 @@ impl FriConfig {
         let starting_domain_log_size =
             ldt_parameters.log_degree + fri_parameters.starting_log_inv_rate;
 
+        let batching_pow_bits = if ldt_parameters.batch_size > 1 {
+            // We now start, the initial folding pow bits
+            pow_util(
+                security_level,
+                fri_parameters.security_assumption.prox_gaps_error(
+                    ldt_parameters.log_degree,
+                    fri_parameters.starting_log_inv_rate,
+                    ldt_parameters.field.extension_bit_size(),
+                    ldt_parameters.batch_size,
+                ),
+            )
+        } else {
+            0.
+        };
+
         // Degree of next polynomial to send
         let mut current_log_degree = ldt_parameters.log_degree - starting_folding_factor;
 
@@ -111,7 +164,7 @@ impl FriConfig {
                 current_log_degree,
                 fri_parameters.starting_log_inv_rate,
                 ldt_parameters.field.extension_bit_size(),
-                starting_folding_factor,
+                1 << starting_folding_factor,
             ),
         );
 
@@ -124,7 +177,7 @@ impl FriConfig {
                 current_log_degree - folding_factor,
                 fri_parameters.starting_log_inv_rate,
                 ldt_parameters.field.extension_bit_size(),
-                folding_factor,
+                1 << folding_factor,
             );
 
             // Now compute the PoW
@@ -159,6 +212,7 @@ impl FriConfig {
             security_assumption: fri_parameters.security_assumption,
             security_level,
             max_pow_bits: fri_parameters.pow_bits,
+            batching_pow_bits,
             starting_folding_factor,
             starting_domain_log_size,
             log_inv_rate: fri_parameters.starting_log_inv_rate,
@@ -166,10 +220,12 @@ impl FriConfig {
             round_parameters,
             queries: final_queries,
             pow_bits: final_pow_bits,
-            final_log_degree,
+            final_poly_log_degree: final_log_degree,
         }
     }
 
+    /// Given a configuration, simulate an execution, keeping track of which elements are sent.
+    /// This is used to compute the proof size.
     pub fn build_proof(&self) -> Proof {
         let starting_merkle_tree = MerkleTree::new(
             self.starting_domain_log_size - self.starting_folding_factor,
@@ -216,7 +272,7 @@ impl FriConfig {
 
         final_round.push(ProofElement::FieldElements(FieldElements {
             field: self.ldt_parameters.field,
-            num_elements: 1 << self.final_log_degree,
+            num_elements: 1 << self.final_poly_log_degree,
             is_extension: true,
         }));
 
@@ -229,7 +285,8 @@ impl FriConfig {
         Proof(proof)
     }
 
-    fn print_config_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    /// Prints a summary of the configuration for FRI.
+    pub fn print_config_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}", self.ldt_parameters)?;
         writeln!(
             f,
@@ -239,13 +296,21 @@ impl FriConfig {
 
         writeln!(
             f,
-            "Initial domain size: 2^{}, initial rate 2^-{}, queries: {}, pow_bits: {}",
+            "Initial domain size: 2^{}, initial rate 2^-{}, queries: {}, pow_bits: {:.1}",
             self.starting_domain_log_size, self.log_inv_rate, self.queries, self.pow_bits
         )?;
 
+        if self.ldt_parameters.batch_size > 1 {
+            writeln!(
+                f,
+                "Batch size: {}, batching_pow_bits: {:.1}",
+                self.ldt_parameters.batch_size, self.batching_pow_bits
+            )?;
+        }
+
         writeln!(
             f,
-            "Initial folding factor: {}, initial_folding_pow_bits: {}",
+            "Initial folding factor: {}, initial_folding_pow_bits: {:.1}",
             self.starting_folding_factor, self.starting_folding_pow_bits
         )?;
         for r in &self.round_parameters {
@@ -255,24 +320,44 @@ impl FriConfig {
         writeln!(
             f,
             "final_queries: {}, final polynomial: {}",
-            self.queries, self.final_log_degree,
+            self.queries, self.final_poly_log_degree,
         )?;
 
         Ok(())
     }
 
-    fn print_rbr_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    /// Displays the round-by-error analysis for the protocol.
+    pub fn print_rbr_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "------------------------------------")?;
         writeln!(f, "Round by round soundness analysis:")?;
         writeln!(f, "------------------------------------")?;
 
+        // The batching error.
+        if self.ldt_parameters.batch_size > 1 {
+            let batching_prox_gaps_error = self.security_assumption.prox_gaps_error(
+                self.ldt_parameters.log_degree,
+                self.log_inv_rate,
+                self.ldt_parameters.field.extension_bit_size(),
+                self.ldt_parameters.batch_size,
+            );
+
+            writeln!(
+                f,
+                "{:.1} bits -- batch prox gaps: {:.1}, pow: {:.1}",
+                batching_prox_gaps_error + self.batching_pow_bits,
+                batching_prox_gaps_error,
+                self.batching_pow_bits,
+            )?;
+        }
+
+        // We now start running FRI
         let mut current_log_degree = self.ldt_parameters.log_degree - self.starting_folding_factor;
 
         let starting_prox_gaps_error = self.security_assumption.prox_gaps_error(
             current_log_degree,
             self.log_inv_rate,
             self.ldt_parameters.field.extension_bit_size(),
-            self.starting_folding_factor,
+            1 << self.starting_folding_factor,
         );
 
         writeln!(
@@ -288,7 +373,7 @@ impl FriConfig {
                 current_log_degree - r.folding_factor,
                 self.log_inv_rate,
                 self.ldt_parameters.field.extension_bit_size(),
-                r.folding_factor,
+                1 << r.folding_factor,
             );
 
             writeln!(
@@ -330,7 +415,7 @@ impl Display for RoundConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
-            "Folding factor: {}, domain_size: 2^{}, folding_pow_bits: {}",
+            "Folding factor: {}, domain_size: 2^{}, folding_pow_bits: {:.1}",
             self.folding_factor, self.evaluation_domain_log_size, self.folding_pow_bits,
         )
     }
