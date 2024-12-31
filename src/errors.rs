@@ -23,14 +23,14 @@ pub enum SecurityAssumption {
 impl SecurityAssumption {
     /// In both JB and CB theorems such as list-size only hold for proximity parameters slighly below the bound.
     /// E.g. in JB proximity gaps holds for every delta \in (0, 1 - sqrt(rho)).
-    /// Eta is the distance between the chosen proximity parameter and the bound.
-    /// I.e. in JB delta = 1 - sqrt(rho) - eta and in CB delta = 1 - rho - eta.
+    /// η is the distance between the chosen proximity parameter and the bound.
+    /// I.e. in JB delta = 1 - sqrt(rho) - η and in CB delta = 1 - rho - η.
     // TODO: Maybe it makes more sense to be multiplicative. I think this can be set in a better way.
     pub fn log_eta(&self, log_inv_rate: usize) -> f64 {
         // Ask me how I did this? At the time, only God and I knew. Now only God knows
         // I joke, I actually know but this is left for posterity.
         match self {
-            // We don't use eta in UD
+            // We don't use η in UD
             Self::UniqueDecoding => 0., // TODO: Maybe just panic and avoid calling it in UD?
             // Set as sqrt(rho)/20
             Self::JohnsonBound => -(0.5 * log_inv_rate as f64 + LOG2_10 + 1.),
@@ -46,12 +46,12 @@ impl SecurityAssumption {
             // In UD the list size is 1
             Self::UniqueDecoding => 0.,
 
-            // By the JB, RS codes are (1 - sqrt(rho) - eta, (2*eta*sqrt(rho))^-1)-list decodable.
+            // By the JB, RS codes are (1 - sqrt(rho) - η, (2*η*sqrt(rho))^-1)-list decodable.
             Self::JohnsonBound => {
                 let log_inv_sqrt_rate: f64 = log_inv_rate as f64 / 2.;
                 log_inv_sqrt_rate - (1. + log_eta)
             }
-            // In CB we assume that RS codes are (1 - rho - eta, d/rho*eta)-list decodable (see Conjecture 5.6 in STIR).
+            // In CB we assume that RS codes are (1 - rho - η, d/rho*η)-list decodable (see Conjecture 5.6 in STIR).
             Self::CapacityBound => (log_degree + log_inv_rate) as f64 - log_eta,
         }
     }
@@ -72,15 +72,15 @@ impl SecurityAssumption {
             Self::UniqueDecoding => (log_degree + log_inv_rate) as f64,
 
             // In JB the error is degree^2/|F| * (2 * min{ 1 - sqrt(rho) - delta, sqrt(rho)/20 })^7
-            // Since delta = 1 - sqrt(rho) - eta then 1 - sqrt(rho) - delta = eta
-            // Thus the error is degree^2/|F| * (2 * min { eta, sqrt(rho)/20 })^7
+            // Since delta = 1 - sqrt(rho) - η then 1 - sqrt(rho) - delta = η
+            // Thus the error is degree^2/|F| * (2 * min { η, sqrt(rho)/20 })^7
             Self::JohnsonBound => {
                 let numerator = (2 * log_degree) as f64;
                 let sqrt_rho_20 = 1. + LOG2_10 + 0.5 * log_inv_rate as f64;
                 numerator + 7. * (sqrt_rho_20.min(-log_eta) - 1.)
             }
 
-            // In JB we assume the error is degree/eta*rate^2
+            // In JB we assume the error is degree/η*rate^2
             Self::CapacityBound => (log_degree + 2 * log_inv_rate) as f64 - log_eta,
         };
 
@@ -92,8 +92,8 @@ impl SecurityAssumption {
     /// The query error is (1 - delta)^t where t is the number of queries.
     /// This computes log(1 - delta).
     /// In UD, delta is (1 - rho)/2
-    /// In JB, delta is (1 - sqrt(rho) - eta)
-    /// In CB, delta is (1 - rho - eta)
+    /// In JB, delta is (1 - sqrt(rho) - η)
+    /// In CB, delta is (1 - rho - η)
     pub fn log_1_delta(&self, log_inv_rate: usize) -> f64 {
         let log_eta = self.log_eta(log_inv_rate);
         let eta = 2_f64.powf(log_eta);
