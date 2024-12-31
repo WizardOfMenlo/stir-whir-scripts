@@ -22,9 +22,9 @@ pub enum SecurityAssumption {
 
 impl SecurityAssumption {
     /// In both JB and CB theorems such as list-size only hold for proximity parameters slighly below the bound.
-    /// E.g. in JB proximity gaps holds for every delta \in (0, 1 - sqrt(ρ)).
+    /// E.g. in JB proximity gaps holds for every δ \in (0, 1 - sqrt(ρ)).
     /// η is the distance between the chosen proximity parameter and the bound.
-    /// I.e. in JB delta = 1 - sqrt(ρ) - η and in CB delta = 1 - ρ - η.
+    /// I.e. in JB δ = 1 - sqrt(ρ) - η and in CB δ = 1 - ρ - η.
     // TODO: Maybe it makes more sense to be multiplicative. I think this can be set in a better way.
     pub fn log_eta(&self, log_inv_rate: usize) -> f64 {
         // Ask me how I did this? At the time, only God and I knew. Now only God knows
@@ -39,7 +39,7 @@ impl SecurityAssumption {
         }
     }
 
-    /// Given a RS code (specified by the log of the degree and log inv of the rate), compute the list size at the specified distance delta.
+    /// Given a RS code (specified by the log of the degree and log inv of the rate), compute the list size at the specified distance δ.
     pub fn list_size_bits(&self, log_degree: usize, log_inv_rate: usize) -> f64 {
         let log_eta = self.log_eta(log_inv_rate);
         match self {
@@ -71,8 +71,8 @@ impl SecurityAssumption {
             // In UD the error is |L|/|F| = d/rate*|F|
             Self::UniqueDecoding => (log_degree + log_inv_rate) as f64,
 
-            // In JB the error is degree^2/|F| * (2 * min{ 1 - sqrt(ρ) - delta, sqrt(ρ)/20 })^7
-            // Since delta = 1 - sqrt(ρ) - η then 1 - sqrt(ρ) - delta = η
+            // In JB the error is degree^2/|F| * (2 * min{ 1 - sqrt(ρ) - δ, sqrt(ρ)/20 })^7
+            // Since δ = 1 - sqrt(ρ) - η then 1 - sqrt(ρ) - δ = η
             // Thus the error is degree^2/|F| * (2 * min { η, sqrt(ρ)/20 })^7
             Self::JohnsonBound => {
                 let numerator = (2 * log_degree) as f64;
@@ -89,11 +89,11 @@ impl SecurityAssumption {
         field_size_bits as f64 - (error + num_functions_1_log as f64)
     }
 
-    /// The query error is (1 - delta)^t where t is the number of queries.
-    /// This computes log(1 - delta).
-    /// In UD, delta is (1 - ρ)/2
-    /// In JB, delta is (1 - sqrt(ρ) - η)
-    /// In CB, delta is (1 - ρ - η)
+    /// The query error is (1 - δ)^t where t is the number of queries.
+    /// This computes log(1 - δ).
+    /// In UD, δ is (1 - ρ)/2
+    /// In JB, δ is (1 - sqrt(ρ) - η)
+    /// In CB, δ is (1 - ρ - η)
     pub fn log_1_delta(&self, log_inv_rate: usize) -> f64 {
         let log_eta = self.log_eta(log_inv_rate);
         let eta = 2_f64.powf(log_eta);
@@ -109,8 +109,8 @@ impl SecurityAssumption {
     }
 
     /// Compute the number of queries to match the security level
-    /// The error to drive down is (1-delta)^t < 2^-secparam.
-    /// Where delta is set as in the `log_1_delta` function.
+    /// The error to drive down is (1-δ)^t < 2^-secparam.
+    /// Where δ is set as in the `log_1_delta` function.
     pub fn queries(&self, protocol_security_level: usize, log_inv_rate: usize) -> usize {
         let num_queries_f = -(protocol_security_level as f64) / self.log_1_delta(log_inv_rate);
 
@@ -118,8 +118,8 @@ impl SecurityAssumption {
     }
 
     /// Compute the error for the given number of queries
-    /// The error to drive down is (1-delta)^t < 2^-secparam.
-    /// Where delta is set as in the `log_1_delta` function.
+    /// The error to drive down is (1-δ)^t < 2^-secparam.
+    /// Where δ is set as in the `log_1_delta` function.
     pub fn queries_error(&self, log_inv_rate: usize, num_queries: usize) -> f64 {
         let num_queries = num_queries as f64;
 
