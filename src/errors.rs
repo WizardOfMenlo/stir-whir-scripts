@@ -8,10 +8,10 @@ pub enum SecurityAssumption {
     /// This requires no conjectures neither in STIR nor WHIR.
     UniqueDecoding,
 
-    /// Johnson bound assumes that the distance of each oracle is within the Johnson bound (1 - sqrt(ρ)).
+    /// Johnson bound assumes that the distance of each oracle is within the Johnson bound (1 - √ρ).
     /// We refer to this configuration as JB for short.
     /// In STIR, this requires no conjecture.
-    /// In WHIR, this assumes that RS have mutual correlated agreement for proximity parameter up to (1 - sqrt(ρ)).
+    /// In WHIR, this assumes that RS have mutual correlated agreement for proximity parameter up to (1 - √ρ).
     JohnsonBound,
 
     /// Capacity bound assumes that the distance of each oracle is within the capacity bound 1 - ρ.
@@ -22,9 +22,9 @@ pub enum SecurityAssumption {
 
 impl SecurityAssumption {
     /// In both JB and CB theorems such as list-size only hold for proximity parameters slighly below the bound.
-    /// E.g. in JB proximity gaps holds for every δ ∈ (0, 1 - sqrt(ρ)).
+    /// E.g. in JB proximity gaps holds for every δ ∈ (0, 1 - √ρ).
     /// η is the distance between the chosen proximity parameter and the bound.
-    /// I.e. in JB δ = 1 - sqrt(ρ) - η and in CB δ = 1 - ρ - η.
+    /// I.e. in JB δ = 1 - √ρ - η and in CB δ = 1 - ρ - η.
     // TODO: Maybe it makes more sense to be multiplicative. I think this can be set in a better way.
     pub fn log_eta(&self, log_inv_rate: usize) -> f64 {
         // Ask me how I did this? At the time, only God and I knew. Now only God knows
@@ -32,7 +32,7 @@ impl SecurityAssumption {
         match self {
             // We don't use η in UD
             Self::UniqueDecoding => 0., // TODO: Maybe just panic and avoid calling it in UD?
-            // Set as sqrt(ρ)/20
+            // Set as √ρ/20
             Self::JohnsonBound => -(0.5 * log_inv_rate as f64 + LOG2_10 + 1.),
             // Set as ρ/20
             Self::CapacityBound => -(log_inv_rate as f64 + LOG2_10 + 1.),
@@ -46,7 +46,7 @@ impl SecurityAssumption {
             // In UD the list size is 1
             Self::UniqueDecoding => 0.,
 
-            // By the JB, RS codes are (1 - sqrt(ρ) - η, (2*η*sqrt(ρ))^-1)-list decodable.
+            // By the JB, RS codes are (1 - √ρ - η, (2*η*√ρ)^-1)-list decodable.
             Self::JohnsonBound => {
                 let log_inv_sqrt_rate: f64 = log_inv_rate as f64 / 2.;
                 log_inv_sqrt_rate - (1. + log_eta)
@@ -71,9 +71,9 @@ impl SecurityAssumption {
             // In UD the error is |L|/|F| = d/rate*|F|
             Self::UniqueDecoding => (log_degree + log_inv_rate) as f64,
 
-            // In JB the error is degree^2/|F| * (2 * min{ 1 - sqrt(ρ) - δ, sqrt(ρ)/20 })^7
-            // Since δ = 1 - sqrt(ρ) - η then 1 - sqrt(ρ) - δ = η
-            // Thus the error is degree^2/|F| * (2 * min { η, sqrt(ρ)/20 })^7
+            // In JB the error is degree^2/|F| * (2 * min{ 1 - √ρ - δ, √ρ/20 })^7
+            // Since δ = 1 - √ρ - η then 1 - √ρ - δ = η
+            // Thus the error is degree^2/|F| * (2 * min { η, √ρ/20 })^7
             Self::JohnsonBound => {
                 let numerator = (2 * log_degree) as f64;
                 let sqrt_rho_20 = 1. + LOG2_10 + 0.5 * log_inv_rate as f64;
@@ -92,7 +92,7 @@ impl SecurityAssumption {
     /// The query error is (1 - δ)^t where t is the number of queries.
     /// This computes log(1 - δ).
     /// In UD, δ is (1 - ρ)/2
-    /// In JB, δ is (1 - sqrt(ρ) - η)
+    /// In JB, δ is (1 - √ρ - η)
     /// In CB, δ is (1 - ρ - η)
     pub fn log_1_delta(&self, log_inv_rate: usize) -> f64 {
         let log_eta = self.log_eta(log_inv_rate);
