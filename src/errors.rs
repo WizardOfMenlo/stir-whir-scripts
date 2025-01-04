@@ -68,7 +68,7 @@ impl SecurityAssumption {
         let log_eta = self.log_eta(log_inv_rate);
         // Note that this does not include the field_size
         let error = match self {
-            // In UD the error is |L|/|F| = d/rate*|F|
+            // In UD the error is |L|/|F| = d/ρ*|F|
             Self::UniqueDecoding => (log_degree + log_inv_rate) as f64,
 
             // In JB the error is degree^2/|F| * (2 * min{ 1 - √ρ - δ, √ρ/20 })^7
@@ -80,7 +80,7 @@ impl SecurityAssumption {
                 numerator + 7. * (sqrt_rho_20.min(-log_eta) - 1.)
             }
 
-            // In JB we assume the error is degree/η*rate^2
+            // In JB we assume the error is degree/η*ρ^2
             Self::CapacityBound => (log_degree + 2 * log_inv_rate) as f64 - log_eta,
         };
 
@@ -109,7 +109,7 @@ impl SecurityAssumption {
     }
 
     /// Compute the number of queries to match the security level
-    /// The error to drive down is (1-δ)^t < 2^-secparam.
+    /// The error to drive down is (1-δ)^t < 2^-λ.
     /// Where δ is set as in the `log_1_delta` function.
     pub fn queries(&self, protocol_security_level: usize, log_inv_rate: usize) -> usize {
         let num_queries_f = -(protocol_security_level as f64) / self.log_1_delta(log_inv_rate);
@@ -118,7 +118,7 @@ impl SecurityAssumption {
     }
 
     /// Compute the error for the given number of queries
-    /// The error to drive down is (1-δ)^t < 2^-secparam.
+    /// The error to drive down is (1-δ)^t < 2^-λ.
     /// Where δ is set as in the `log_1_delta` function.
     pub fn queries_error(&self, log_inv_rate: usize, num_queries: usize) -> f64 {
         let num_queries = num_queries as f64;
