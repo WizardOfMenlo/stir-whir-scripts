@@ -1,12 +1,10 @@
-/*
 use stir_whir_estimation::{
     errors::SecurityAssumption,
     field::*,
-    fri::{FriConfig, FriParameters},
-    stir::{StirConfig, StirParameters},
+    //fri::{FriConfig, FriParameters},
+    stir::{StirParameters, StirProtocol},
     LowDegreeParameters,
 };
-
 
 fn main() {
     let ldt_parameters = LowDegreeParameters {
@@ -15,19 +13,11 @@ fn main() {
         batch_size: 1,
     };
 
-
     let stir_parameters =
-        StirParameters::fixed_domain_shift(1, 4, 4, SecurityAssumption::CapacityBound, 120, 20);
-    let stir_config = StirConfig::new(ldt_parameters, stir_parameters);
+        StirParameters::fixed_domain_shift(1, 4, 4, SecurityAssumption::CapacityBound, 100, 20);
+    let stir_protocol = StirProtocol::new(ldt_parameters, stir_parameters);
 
-    let fri_parameters =
-        FriParameters::fixed_folding(1, 4, 4, SecurityAssumption::CapacityBound, 120, 20);
-    let fri_config = FriConfig::new(ldt_parameters, fri_parameters);
-
-    println!("{}", stir_config);
-    println!("{}", fri_config);
-
+    println!("{:#?}", stir_protocol);
+    println!("{}", stir_protocol.config);
+    //println!("{}", fri_config);
 }
-*/
-
-fn main() {}

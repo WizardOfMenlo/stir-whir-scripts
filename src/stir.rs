@@ -85,9 +85,10 @@ impl StirParameters {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct StirProtocol {
-    config: StirConfig,
-    protocol: Protocol,
+    pub config: StirConfig,
+    pub protocol: Protocol,
 }
 
 impl StirProtocol {
@@ -355,7 +356,7 @@ impl StirProtocol {
 }
 
 /// A fully expanded STIR configuration.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct StirConfig {
     /// The configuration for the LDT desired.
     pub(crate) ldt_parameters: LowDegreeParameters,
@@ -415,4 +416,68 @@ pub(crate) struct RoundConfig {
     pub(crate) ood_samples: usize,
     /// Rate of current RS codeword
     pub(crate) log_inv_rate: usize,
+}
+
+impl StirConfig {
+    /// Prints a summary of the configuration for STIR.
+    pub fn print_config_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{}", self.ldt_parameters)?;
+        writeln!(
+            f,
+            "Security level: {} bits using {} security and {} bits of PoW",
+            self.security_level, self.security_assumption, self.max_pow_bits
+        )?;
+
+        writeln!(
+            f,
+            "Initial domain size: 2^{}, initial rate 2^-{}",
+            self.starting_domain_log_size, self.starting_log_inv_rate,
+        )?;
+
+        if self.ldt_parameters.batch_size > 1 {
+            writeln!(
+                f,
+                "Batch size: {}, batching_pow_bits: {:.1}",
+                self.ldt_parameters.batch_size, self.batching_pow_bits
+            )?;
+        }
+
+        writeln!(
+            f,
+            "Initial folding factor: {}, initial_folding_pow_bits: {:.1}",
+            self.starting_folding_factor, self.starting_folding_pow_bits
+        )?;
+        for r in &self.round_parameters {
+            r.fmt(f)?;
+        }
+
+        writeln!(
+            f,
+            "final_queries: {}, final polynomial: {}, final_rate: 2^-{}, final_pow_bits: {:.1}",
+            self.final_queries,
+            self.final_poly_log_degree,
+            self.final_log_inv_rate,
+            self.final_pow_bits,
+        )?;
+
+        Ok(())
+    }
+}
+
+impl Display for StirConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.print_config_summary(f)
+        //self.print_rbr_summary(f)?;
+        //writeln!(f, "{}", self.build_proof())
+    }
+}
+
+impl Display for RoundConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Folding factor: {}, domain_size: 2^{}, num_queries: {}, rate: 2^-{}, pow_bits: {:.1}, ood_samples: {}",
+            self.folding_factor, self.evaluation_domain_log_size, self.num_queries, self.log_inv_rate, self.pow_bits, self.ood_samples,
+        )
+    }
 }
