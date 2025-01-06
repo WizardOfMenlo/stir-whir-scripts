@@ -1,7 +1,4 @@
 //! Misc utilities for computing proof size
-
-use std::fmt::Display;
-
 use crate::field::Field;
 
 /// A token which is part of the argument string
@@ -15,96 +12,14 @@ pub enum ProofElement {
     FieldElements(FieldElements),
 }
 
-/// A proof round contains the `ProofElement`s relating to this round.
-#[derive(Debug, Clone)]
-pub struct ProofRound {
-    pub round_number: usize,
-    pub proof_elements: Vec<ProofElement>,
-}
-
-/// A proof consists of a list of proof rounds.
-#[derive(Debug, Clone)]
-pub struct Proof(pub Vec<ProofRound>);
-
-impl Proof {
+impl ProofElement {
     /// Given a proof, compute the total number of bits.
-    pub fn total_size_bits(&self) -> usize {
-        let mut res = 0;
-        for r in &self.0 {
-            for el in &r.proof_elements {
-                res += match el {
-                    ProofElement::MerkleRoot(tree) => tree.digest_size,
-                    ProofElement::MerkleQueries(queries) => queries.estimate_size_bits(),
-                    ProofElement::FieldElements(elements) => elements.size_bits(),
-                };
-            }
+    pub fn size_bits(&self) -> usize {
+        match self {
+            ProofElement::MerkleRoot(tree) => tree.digest_size,
+            ProofElement::MerkleQueries(queries) => queries.estimate_size_bits(),
+            ProofElement::FieldElements(elements) => elements.size_bits(),
         }
-
-        res
-    }
-}
-
-/// Converts a number of bits into an appropriate unit.
-fn display_size(bits: usize) -> String {
-    if bits == 0 {
-        return "0B".to_owned();
-    }
-
-    let size_bytes = bits as f64 / 8.;
-    let size_name = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
-    let i = size_bytes.log(1024_f64).floor() as usize;
-    let p = 1024_f64.powf(i as f64);
-    let s = (size_bytes / p).round();
-
-    format!("{} {}", s, size_name[i])
-}
-
-impl Display for Proof {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "------------------------------------")?;
-        writeln!(f, "Proof breakdown:")?;
-        writeln!(f, "------------------------------------")?;
-
-        for r in &self.0 {
-            writeln!(f, "Round {}", r.round_number)?;
-
-            for element in &r.proof_elements {
-                match element {
-                    ProofElement::MerkleRoot(tree) => {
-                        writeln!(f, "Merkle root: {}", display_size(tree.digest_size))?;
-                    }
-                    ProofElement::MerkleQueries(queries) => {
-                        writeln!(
-                            f,
-                            "Openings {}, copaths: {}, leaves: {}, total: {}",
-                            queries.num_openings,
-                            display_size(queries.copath_size()),
-                            display_size(queries.opening_size()),
-                            display_size(queries.estimate_size_bits())
-                        )?;
-                    }
-                    ProofElement::FieldElements(elems) => {
-                        writeln!(
-                            f,
-                            "Field elements: {} over {}, total: {}",
-                            elems.num_elements,
-                            if elems.is_extension {
-                                "extension"
-                            } else {
-                                "base"
-                            },
-                            display_size(elems.size_bits())
-                        )?;
-                    }
-                }
-            }
-        }
-
-        writeln!(
-            f,
-            "Total proof size: {}",
-            display_size(self.total_size_bits())
-        )
     }
 }
 
