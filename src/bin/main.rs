@@ -17,7 +17,6 @@ fn main() {
         StirParameters::fixed_domain_shift(1, 4, 4, SecurityAssumption::CapacityBound, 100, 20);
     let stir_protocol = StirProtocol::new(ldt_parameters, stir_parameters);
 
-    println!("{:#?}", stir_protocol);
-    println!("{}", stir_protocol.config);
+    println!("{}", stir_protocol);
     //println!("{}", fri_config);
 }

@@ -1,6 +1,8 @@
 pub mod builder;
 pub mod proof_size;
 
+use std::fmt;
+
 use proof_size::ProofElement;
 
 #[derive(Debug, Clone)]
@@ -23,6 +25,23 @@ impl Protocol {
                 })
             })
             .sum()
+    }
+
+    pub fn print_rbr_summary(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Protocol {}", self.protocol_name)?;
+        for round in &self.rounds {
+            writeln!(f, "Round: {}", round.name)?;
+            for message in &round.messages {
+                if let Message::VerifierMessage(verifier_message) = message {
+                    writeln!(f, "  Total RBR Error: {}", verifier_message.rbr_error())?;
+                    for rbr_error in &verifier_message.rbr_errors {
+                        writeln!(f, "    {}: {}", rbr_error.name, rbr_error.error)?;
+                    }
+                    writeln!(f, "    pow_bits: {}", verifier_message.pow_bits)?;
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn rbr_errors(&self) -> Vec<f64> {
