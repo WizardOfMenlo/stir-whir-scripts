@@ -1,7 +1,7 @@
 use stir_whir_estimation::{
     errors::SecurityAssumption,
     field::*,
-    //fri::{FriConfig, FriParameters},
+    fri::{FriParameters, FriProtocol},
     stir::{StirParameters, StirProtocol},
     LowDegreeParameters,
 };
@@ -24,6 +24,10 @@ fn main() {
     );
     let stir_protocol = StirProtocol::new(ldt_parameters, stir_parameters);
 
+    let fri_parameters =
+        FriParameters::fixed_folding(1, 4, 4, SecurityAssumption::CapacityBound, 100, 20, 256);
+    let fri_protocol = FriProtocol::new(ldt_parameters, fri_parameters);
+
     println!("{}", stir_protocol);
-    //println!("{}", fri_config);
+    println!("{}", fri_protocol);
 }

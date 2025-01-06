@@ -34,13 +34,13 @@ pub struct StirParameters {
     /// The security level desired.
     pub security_level: usize,
 
-    /// The size of the digest for the Merkle tree
-    pub digest_size_bits: usize,
-
     /// The number of pow bits to use to reduce query error.
     /// Traditionally called also "grinding".
     /// NOTE: This does not affect the pow bits used to reduce proximity gaps errors.
     pub pow_bits: usize,
+
+    /// The size of the digest for the Merkle tree
+    pub digest_size_bits: usize,
 }
 
 impl StirParameters {
@@ -134,7 +134,8 @@ impl StirProtocol {
         let starting_domain_log_size =
             ldt_parameters.log_degree + stir_parameters.starting_log_inv_rate;
 
-        let mut protocol_builder = ProtocolBuilder::new("STIR protocol", 256); // TODO: Change
+        let mut protocol_builder =
+            ProtocolBuilder::new("STIR protocol", stir_parameters.digest_size_bits);
 
         // Pow bits for the batching steps
         let mut batching_pow_bits = 0.;
@@ -365,7 +366,7 @@ impl StirProtocol {
 impl Display for StirProtocol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.config.fmt(f)?;
-        write!(f, "{}", self.protocol)
+        self.protocol.fmt(f)
     }
 }
 
@@ -481,8 +482,6 @@ impl StirConfig {
 impl Display for StirConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.print_config_summary(f)
-        //self.print_rbr_summary(f)?;
-        //writeln!(f, "{}", self.build_proof())
     }
 }
 
