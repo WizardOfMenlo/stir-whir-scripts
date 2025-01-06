@@ -33,11 +33,11 @@ impl Protocol {
             writeln!(f, "Round: {}", round.name)?;
             for message in &round.messages {
                 if let Message::VerifierMessage(verifier_message) = message {
-                    writeln!(f, "  Total RBR Error: {}", verifier_message.rbr_error())?;
+                    writeln!(f, "  Total RBR Error: {:.1}", verifier_message.rbr_error())?;
                     for rbr_error in &verifier_message.rbr_errors {
-                        writeln!(f, "    {}: {}", rbr_error.name, rbr_error.error)?;
+                        writeln!(f, "    - {}: {:.1}", rbr_error.name, rbr_error.error)?;
                     }
-                    writeln!(f, "    pow_bits: {}", verifier_message.pow_bits)?;
+                    writeln!(f, "    + pow_bits: {:.1}", verifier_message.pow_bits)?;
                 }
             }
         }
