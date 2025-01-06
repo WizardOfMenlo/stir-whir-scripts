@@ -5,6 +5,8 @@ use std::fmt;
 
 use proof_size::ProofElement;
 
+use crate::utils::pretty_print_float_slice;
+
 #[derive(Debug, Clone)]
 pub struct Protocol {
     protocol_name: String,
@@ -41,7 +43,8 @@ impl Protocol {
                 }
             }
         }
-        Ok(())
+        write!(f, "RbR vector: ")?;
+        pretty_print_float_slice(f, &self.rbr_errors())
     }
 
     pub fn rbr_errors(&self) -> Vec<f64> {

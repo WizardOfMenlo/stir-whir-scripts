@@ -1,3 +1,5 @@
+use std::fmt;
+
 pub(crate) fn pow_util(security_level: usize, error: f64) -> f64 {
     0f64.max(security_level as f64 - error)
 }
@@ -15,4 +17,15 @@ pub(crate) fn display_size(bits: usize) -> String {
     let s = (size_bytes / p).round();
 
     format!("{} {}", s, size_name[i])
+}
+
+pub(crate) fn pretty_print_float_slice(f: &mut fmt::Formatter<'_>, v: &[f64]) -> fmt::Result {
+    write!(f, "[")?;
+    for (i, value) in v.iter().enumerate() {
+        if i > 0 {
+            write!(f, ", ")?;
+        }
+        write!(f, "{:.2}", value)?;
+    }
+    writeln!(f, "]")
 }
