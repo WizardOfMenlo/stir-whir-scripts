@@ -14,18 +14,26 @@ fn main() {
     };
 
     let stir_parameters = StirParameters::fixed_domain_shift(
-        1,
-        4,
-        4,
-        SecurityAssumption::CapacityBound,
-        100,
-        20,
-        256,
+        1,                                 // log_inv_rate
+        4,                                 // folding_factor
+        4,                                 // num_rounds
+        SecurityAssumption::CapacityBound, // security_assumption
+        100,                               // security_level
+        20,                                // pow_bits
+        256,                               // digest_size_bits
     );
     let stir_protocol = StirProtocol::new(ldt_parameters, stir_parameters);
 
-    let fri_parameters =
-        FriParameters::fixed_folding(1, 4, 4, SecurityAssumption::CapacityBound, 100, 20, 256);
+    let fri_parameters = FriParameters::fixed_folding(
+        1,                                 // log_inv_rate
+        4,                                 // folding_factor
+        4,                                 // num_rounds
+        SecurityAssumption::CapacityBound, // security_assumption
+        100,                               // security_level
+        20,                                // pow_bits
+        256,                               // digest_size_bits
+    );
+
     let fri_protocol = FriProtocol::new(ldt_parameters, fri_parameters);
 
     println!("{}", stir_protocol);
