@@ -29,6 +29,14 @@ pub struct Protocol {
 }
 
 impl Protocol {
+    /// Compose two protocols together
+    pub fn chain(mut self, other: Protocol) -> Self {
+        assert_eq!(self.digest_size_bits, other.digest_size_bits);
+        self.protocol_name = format!("{} <> {}", self.protocol_name, other.protocol_name);
+        self.rounds.extend(other.rounds);
+        self
+    }
+
     /// Calculates the proof size in bits of the protocol
     pub fn proof_size_bits(&self) -> usize {
         self.rounds
