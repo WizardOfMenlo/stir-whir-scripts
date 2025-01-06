@@ -3,9 +3,9 @@ use std::fmt::Display;
 use crate::{
     errors::SecurityAssumption,
     protocol::{
-        builder::{ProtocolBuilder, RoundBuilder},
+        builder::ProtocolBuilder,
         proof_size::{FieldElements, MerkleQueries, MerkleTree, ProofElement},
-        Protocol, ProverMessage, RbRError, Round, VerifierMessage,
+        Protocol, ProverMessage, RbRError, VerifierMessage,
     },
     utils::pow_util,
     LowDegreeParameters,
@@ -34,6 +34,9 @@ pub struct StirParameters {
     /// The security level desired.
     pub security_level: usize,
 
+    /// The size of the digest for the Merkle tree
+    pub digest_size_bits: usize,
+
     /// The number of pow bits to use to reduce query error.
     /// Traditionally called also "grinding".
     /// NOTE: This does not affect the pow bits used to reduce proximity gaps errors.
@@ -49,6 +52,7 @@ impl StirParameters {
         security_assumption: SecurityAssumption,
         security_level: usize,
         pow_bits: usize,
+        digest_size_bits: usize,
     ) -> Self {
         StirParameters {
             starting_log_inv_rate: log_inv_rate,
@@ -57,6 +61,7 @@ impl StirParameters {
             log_inv_rates: vec![log_inv_rate; num_rounds],
             security_assumption,
             security_level,
+            digest_size_bits,
             pow_bits,
         }
     }
@@ -70,6 +75,7 @@ impl StirParameters {
         security_assumption: SecurityAssumption,
         security_level: usize,
         pow_bits: usize,
+        digest_size_bits: usize,
     ) -> Self {
         StirParameters {
             starting_log_inv_rate: log_inv_rate,
@@ -79,6 +85,7 @@ impl StirParameters {
                 .map(|i| log_inv_rate + (i + 1) * (folding_factor - 1))
                 .collect(),
             security_assumption,
+            digest_size_bits,
             security_level,
             pow_bits,
         }
@@ -127,7 +134,7 @@ impl StirProtocol {
         let starting_domain_log_size =
             ldt_parameters.log_degree + stir_parameters.starting_log_inv_rate;
 
-        let mut protocol_builder = ProtocolBuilder::new("STIR protocol");
+        let mut protocol_builder = ProtocolBuilder::new("STIR protocol", 256); // TODO: Change
 
         // Pow bits for the batching steps
         let mut batching_pow_bits = 0.;

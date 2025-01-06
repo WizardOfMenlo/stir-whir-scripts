@@ -10,6 +10,7 @@ use crate::utils::{display_size, pretty_print_float_slice};
 #[derive(Debug, Clone)]
 pub struct Protocol {
     protocol_name: String,
+    digest_size_bits: usize,
     rounds: Vec<Round>,
 }
 
@@ -82,6 +83,36 @@ impl Protocol {
                 })
             })
             .collect()
+    }
+
+    pub fn rbr_error(&self) -> f64 {
+        *self
+            .rbr_errors()
+            .iter()
+            .min_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap()
+    }
+
+    pub fn compiled_classical_security(&self, log_ro_queries: usize) -> f64 {
+        let log_ro_queries = log_ro_queries as f64;
+        let min_error = self.rbr_error();
+
+        // State restoration error
+        // Thm 31.3.1 from [CY24] (discounting the +k terms as the number of rounds is
+        // much smaller than then num of queries)
+        let state_restoration_error = min_error - log_ro_queries;
+
+        // Thm 26.1.1 from [CY24] (assuming that 6 * l * (log l + 1) <= t and taking min instead of summing to avoid precisions issue)
+        state_restoration_error
+            .min(self.digest_size_bits as f64 - ((3_f64).log2() + 2. * log_ro_queries))
+    }
+    pub fn compiled_quantum_security(&self, log_ro_queries: usize) -> f64 {
+        let log_ro_queries = log_ro_queries as f64;
+        let min_error = self.rbr_error();
+
+        // Thm 8.6 in 2019/834 (again taking min instead of summing)
+        // NOTE: That thm only gives asymptotics and not concrete
+        (min_error - 2. * log_ro_queries).min(self.digest_size_bits as f64 - (3. * log_ro_queries))
     }
 }
 

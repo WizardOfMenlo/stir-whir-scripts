@@ -1,15 +1,17 @@
-use super::{Message, Protocol, ProverMessage, Round, VerifierMessage};
+use super::{proof_size::ProofElement, Message, Protocol, ProverMessage, Round, VerifierMessage};
 
 pub struct ProtocolBuilder {
     protocol_name: String,
+    digest_size_bits: usize,
     rounds: Vec<Round>,
     current_round: Option<RoundBuilder>,
 }
 
 impl ProtocolBuilder {
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: &str, digest_size_bits: usize) -> Self {
         Self {
             protocol_name: name.to_owned(),
+            digest_size_bits,
             rounds: Vec::new(),
             current_round: None,
         }
@@ -21,6 +23,16 @@ impl ProtocolBuilder {
     }
 
     pub fn prover_message(mut self, message: ProverMessage) -> Self {
+        let digest_len = match message.element {
+            ProofElement::MerkleRoot(mt) => mt.digest_size,
+            ProofElement::MerkleQueries(mt_queries) => mt_queries.merkle_tree.digest_size,
+            _ => self.digest_size_bits,
+        };
+        assert_eq!(
+            digest_len, self.digest_size_bits,
+            "Digest size does not match protocol's"
+        );
+
         self.current_round
             .as_mut()
             .unwrap_or_else(|| panic!("No current round started"))
@@ -49,6 +61,7 @@ impl ProtocolBuilder {
         assert!(self.current_round.is_none(), "Round was not finalized");
         Protocol {
             protocol_name: self.protocol_name,
+            digest_size_bits: self.digest_size_bits,
             rounds: self.rounds,
         }
     }
