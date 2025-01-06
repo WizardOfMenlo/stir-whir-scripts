@@ -5,7 +5,7 @@ use std::fmt;
 
 use proof_size::ProofElement;
 
-use crate::utils::pretty_print_float_slice;
+use crate::utils::{display_size, pretty_print_float_slice};
 
 #[derive(Debug, Clone)]
 pub struct Protocol {
@@ -27,6 +27,28 @@ impl Protocol {
                 })
             })
             .sum()
+    }
+
+    pub fn print_size_summary(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Protocol {}", self.protocol_name)?;
+        for round in &self.rounds {
+            writeln!(f, "Round: {}", round.name)?;
+            for message in &round.messages {
+                if let Message::ProverMessage(prover_message) = message {
+                    writeln!(
+                        f,
+                        "  {}: {}",
+                        prover_message.element.element_type(),
+                        display_size(prover_message.element.size_bits())
+                    )?;
+                }
+            }
+        }
+        writeln!(
+            f,
+            "Total Proof Size: {}",
+            display_size(self.proof_size_bits())
+        )
     }
 
     pub fn print_rbr_summary(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -60,6 +82,13 @@ impl Protocol {
                 })
             })
             .collect()
+    }
+}
+
+impl fmt::Display for Protocol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.print_rbr_summary(f)?;
+        self.print_size_summary(f)
     }
 }
 

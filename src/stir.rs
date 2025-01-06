@@ -358,7 +358,7 @@ impl StirProtocol {
 impl Display for StirProtocol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.config.fmt(f)?;
-        self.protocol.print_rbr_summary(f)
+        write!(f, "{}", self.protocol)
     }
 }
 

@@ -13,6 +13,16 @@ pub enum ProofElement {
 }
 
 impl ProofElement {
+    pub fn element_type(&self) -> &'static str {
+        match self {
+            ProofElement::MerkleRoot(_) => "MerkleRoot",
+            ProofElement::MerkleQueries(_) => "MerkleQueries",
+            ProofElement::FieldElements(_) => "FieldElements",
+        }
+    }
+}
+
+impl ProofElement {
     /// Given a proof, compute the total number of bits.
     pub fn size_bits(&self) -> usize {
         match self {
