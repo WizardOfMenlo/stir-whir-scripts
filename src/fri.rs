@@ -64,6 +64,7 @@ impl FriParameters {
     }
 }
 
+/// The configuration and structure of the FRI protocol.
 #[derive(Debug, Clone)]
 pub struct FriProtocol {
     pub config: FriConfig,

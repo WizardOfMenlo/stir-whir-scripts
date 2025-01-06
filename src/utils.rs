@@ -19,6 +19,7 @@ pub(crate) fn display_size(bits: usize) -> String {
     format!("{} {}", s, size_name[i])
 }
 
+/// Prints prettily a slice of floats
 pub(crate) fn pretty_print_float_slice(f: &mut fmt::Formatter<'_>, v: &[f64]) -> fmt::Result {
     write!(f, "[")?;
     for (i, value) in v.iter().enumerate() {

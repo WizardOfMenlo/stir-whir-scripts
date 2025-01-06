@@ -92,6 +92,7 @@ impl StirParameters {
     }
 }
 
+/// The configuration and structure of the FRI protocol.
 #[derive(Debug, Clone)]
 pub struct StirProtocol {
     pub config: StirConfig,
