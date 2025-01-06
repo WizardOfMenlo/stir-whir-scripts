@@ -6,67 +6,108 @@ use proof_size::ProofElement;
 #[derive(Debug, Clone)]
 pub struct Protocol {
     protocol_name: String,
-    iterations: Vec<Iteration>,
+    rounds: Vec<Round>,
 }
 
 impl Protocol {
     pub fn proof_size_bits(&self) -> usize {
-        self.iterations
+        self.rounds
             .iter()
-            .flat_map(|iteration| &iteration.rounds)
-            .flat_map(|round| &round.prover_message.elements)
-            .map(|element| element.size_bits())
+            .flat_map(|round| {
+                round.messages.iter().filter_map(|message| {
+                    if let Message::ProverMessage(prover_message) = message {
+                        Some(prover_message.element.size_bits())
+                    } else {
+                        None
+                    }
+                })
+            })
             .sum()
     }
 
-    pub fn get_rbr_errors(&self) -> Vec<f64> {
-        self.iterations
+    pub fn rbr_errors(&self) -> Vec<f64> {
+        self.rounds
             .iter()
-            .flat_map(|iteration| {
-                iteration
-                    .rounds
-                    .iter()
-                    .map(|round| round.verifier_message.rbr_error)
+            .flat_map(|round| {
+                round.messages.iter().filter_map(|message| {
+                    if let Message::VerifierMessage(verifier_message) = message {
+                        Some(verifier_message.rbr_error())
+                    } else {
+                        None
+                    }
+                })
             })
             .collect()
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct Iteration {
-    rounds: Vec<Round>,
+pub struct Round {
+    name: String,
+    messages: Vec<Message>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Round {
-    prover_message: ProverMessage,
-    verifier_message: VerifierMessage,
+pub enum Message {
+    ProverMessage(ProverMessage),
+    VerifierMessage(VerifierMessage),
+}
+
+impl Message {
+    pub fn is_prover_message(&self) -> bool {
+        matches!(self, Message::ProverMessage(_))
+    }
+
+    pub fn is_verifier_message(&self) -> bool {
+        matches!(self, Message::VerifierMessage(_))
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct ProverMessage {
-    elements: Vec<ProofElement>,
+    element: ProofElement,
 }
 
 impl ProverMessage {
-    pub fn new(elements: Vec<ProofElement>) -> Self {
-        Self { elements }
+    pub fn new(element: ProofElement) -> Self {
+        Self { element }
     }
+}
 
-    pub fn new_single(element: ProofElement) -> Self {
+#[derive(Debug, Clone)]
+pub struct RbRError {
+    name: String,
+    error: f64,
+}
+
+impl RbRError {
+    pub fn new(name: &str, error: f64) -> Self {
         Self {
-            elements: vec![element],
+            name: name.to_string(),
+            error,
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct VerifierMessage {
-    rbr_error: f64,
+    rbr_errors: Vec<RbRError>,
+    pow_bits: f64,
 }
 
 impl VerifierMessage {
-    pub fn new(rbr_error: f64) -> Self {
-        Self { rbr_error }
+    pub fn new(rbr_errors: Vec<RbRError>, pow_bits: f64) -> Self {
+        Self {
+            rbr_errors,
+            pow_bits,
+        }
+    }
+    pub fn rbr_error(&self) -> f64 {
+        self.rbr_errors
+            .iter()
+            .map(|e| e.error)
+            .min_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap()
+            + self.pow_bits
     }
 }

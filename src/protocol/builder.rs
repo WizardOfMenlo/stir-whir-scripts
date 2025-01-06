@@ -1,81 +1,77 @@
-use super::{Iteration, Protocol, ProverMessage, Round, VerifierMessage};
+use super::{Message, Protocol, ProverMessage, Round, VerifierMessage};
 
 pub struct ProtocolBuilder {
     protocol_name: String,
-    iterations: Vec<Iteration>,
+    rounds: Vec<Round>,
+    current_round: Option<RoundBuilder>,
 }
 
 impl ProtocolBuilder {
     pub fn new(name: &str) -> Self {
         Self {
             protocol_name: name.to_owned(),
-            iterations: Vec::new(),
+            rounds: Vec::new(),
+            current_round: None,
         }
     }
 
-    pub fn add_iteration(self, iteration: Iteration) -> Self {
-        let mut new_self = self;
-        new_self.iterations.push(iteration);
-        new_self
-    }
-
-    pub fn build(self) -> Protocol {
-        Protocol {
-            protocol_name: self.protocol_name,
-            iterations: self.iterations,
-        }
-    }
-}
-
-pub struct IterationBuilder {
-    rounds: Vec<Round>,
-}
-
-impl IterationBuilder {
-    pub fn new() -> Self {
-        Self { rounds: Vec::new() }
-    }
-
-    pub fn add_round(mut self, round: Round) -> Self {
-        self.rounds.push(round);
+    pub fn start_round(mut self, name: &str) -> Self {
+        self.current_round = Some(RoundBuilder::new(name));
         self
     }
 
-    pub fn build(self) -> Iteration {
-        assert!(!self.rounds.is_empty());
-        Iteration {
+    pub fn prover_message(mut self, message: ProverMessage) -> Self {
+        self.current_round
+            .as_mut()
+            .unwrap_or_else(|| panic!("No current round started"))
+            .rounds
+            .push(Message::ProverMessage(message));
+        self
+    }
+
+    pub fn verifier_message(mut self, message: VerifierMessage) -> Self {
+        self.current_round
+            .as_mut()
+            .unwrap_or_else(|| panic!("No current round started"))
+            .rounds
+            .push(Message::VerifierMessage(message));
+        self
+    }
+
+    pub fn end_round(mut self) -> Self {
+        if let Some(round_builder) = self.current_round.take() {
+            self.rounds.push(round_builder.build());
+        }
+        self
+    }
+
+    pub fn build(self) -> Protocol {
+        assert!(self.current_round.is_none(), "Round was not finalized");
+        Protocol {
+            protocol_name: self.protocol_name,
             rounds: self.rounds,
         }
     }
 }
 
 pub struct RoundBuilder {
-    prover_message: Option<ProverMessage>,
-    verifier_message: Option<VerifierMessage>,
+    name: String,
+    rounds: Vec<Message>,
 }
 
 impl RoundBuilder {
-    pub fn new() -> Self {
+    pub fn new(name: &str) -> Self {
         Self {
-            prover_message: None,
-            verifier_message: None,
+            name: name.to_string(),
+            rounds: Vec::new(),
         }
     }
 
-    pub fn prover_message(mut self, prover_message: ProverMessage) -> Self {
-        self.prover_message = Some(prover_message);
-        self
-    }
-
-    pub fn verifier_message(mut self, verifier_message: VerifierMessage) -> Self {
-        self.verifier_message = Some(verifier_message);
-        self
-    }
-
     pub fn build(self) -> Round {
+        assert!(!self.rounds.is_empty());
         Round {
-            prover_message: self.prover_message.expect("Prover message must be set"),
-            verifier_message: self.verifier_message.expect("Verifier message must be set"),
+            name: self.name,
+            messages: self.rounds,
         }
     }
 }

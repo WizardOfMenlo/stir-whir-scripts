@@ -1,3 +1,4 @@
+/*
 use stir_whir_estimation::{
     errors::SecurityAssumption,
     field::*,
@@ -6,12 +7,14 @@ use stir_whir_estimation::{
     LowDegreeParameters,
 };
 
+
 fn main() {
     let ldt_parameters = LowDegreeParameters {
         field: GOLDILOCKS_2,
         log_degree: 26,
         batch_size: 1,
     };
+
 
     let stir_parameters =
         StirParameters::fixed_domain_shift(1, 4, 4, SecurityAssumption::CapacityBound, 120, 20);
@@ -23,4 +26,8 @@ fn main() {
 
     println!("{}", stir_config);
     println!("{}", fri_config);
+
 }
+*/
+
+fn main() {}
