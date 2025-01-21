@@ -5,7 +5,7 @@ use field::Field;
 pub mod errors;
 pub mod field;
 pub mod fri;
-pub mod proof_size;
+pub mod protocol;
 pub mod stir;
 pub(crate) mod utils;
 
