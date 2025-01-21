@@ -82,7 +82,7 @@ impl Protocol {
         )
     }
 
-    /// Prints a summary of the round-by-errors in each round of the protocol.
+    /// Prints a summary of the round-by-round errors in each round of the protocol.
     pub fn print_rbr_summary(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Protocol {}", self.protocol_name)?;
         for round in &self.rounds {
