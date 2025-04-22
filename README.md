@@ -6,6 +6,6 @@ By [Gal Arnon](https://galarnon42.github.io/) [Alessandro Chiesa](https://ic-peo
 **WARNING:** This is a **WIP** academic prototype and has not received careful code review. This implementation is NOT ready for production use.
 
 <p align="center">
-    <a href="https://github.com/WizardOfMenlo/whir/blob/main/LICENSE-APACHE"><img src="https://img.shields.io/badge/license-APACHE-blue.svg"></a>
-    <a href="https://github.com/WizardOfMenlo/whir/blob/main/LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+    <a href="https://github.com/WizardOfMenlo/stir-whir-scripts/blob/main/LICENSE-APACHE"><img src="https://img.shields.io/badge/license-APACHE-blue.svg"></a>
+    <a href="https://github.com/WizardOfMenlo/stir-whir-scripts/blob/main/LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
 </p>
