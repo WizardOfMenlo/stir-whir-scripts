@@ -9,6 +9,7 @@ pub mod fri;
 pub mod protocol;
 pub mod stir;
 pub(crate) mod utils;
+pub mod whir;
 
 /// Selects a default maximum number of PoW such that any values greater than it results in an error.
 pub fn default_max_pow(num_variables: usize, log_inv_rate: usize) -> usize {

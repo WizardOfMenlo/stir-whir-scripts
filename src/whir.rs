@@ -7,13 +7,13 @@ use crate::{
         proof_size::{FieldElements, MerkleQueries, MerkleTree, ProofElement},
         Protocol, ProverMessage, RbRError, VerifierMessage,
     },
-    utils::pow_util,
+    utils::{pow_util, pretty_print_float_slice},
     LowDegreeParameters,
 };
 
-/// Parameters parametrizing an instance of STIR.
-/// This does not include the entire configuration of STIR, as we populate that later on according to required security config.#[derive(Clone)]
-pub struct StirParameters {
+/// Parameters parametrizing an instance of WHIR.
+/// This does not include the entire configuration of WHIR, as we populate that later on according to required security config.#[derive(Clone)]
+pub struct WhirParameters {
     /// The starting rate used in the protocol.
     pub starting_log_inv_rate: usize,
 
@@ -25,10 +25,10 @@ pub struct StirParameters {
     /// Given in log form, i.e. folding_factors[i] = 2 implies that the degree in round i is reduced by a factor of 4.
     pub folding_factors: Vec<usize>,
 
-    /// The rates used in the internal rounds of STIR.
+    /// The rates used in the internal rounds of WHIR.
     pub log_inv_rates: Vec<usize>,
 
-    /// The security assumption under which to configure STIR.
+    /// The security assumption under which to configure WHIR.
     pub security_assumption: SecurityAssumption,
 
     /// The security level desired.
@@ -43,8 +43,8 @@ pub struct StirParameters {
     pub digest_size_bits: usize,
 }
 
-impl StirParameters {
-    /// Instantiates a STIR configuration in which the rate is constant. This is a worse version of FRI.
+impl WhirParameters {
+    /// Instantiates a WHIR configuration in which the rate is constant. This is a worse version of FRI.
     pub fn fixed_rate_folding(
         log_inv_rate: usize,
         folding_factor: usize,
@@ -54,7 +54,7 @@ impl StirParameters {
         pow_bits: usize,
         digest_size_bits: usize,
     ) -> Self {
-        StirParameters {
+        WhirParameters {
             starting_log_inv_rate: log_inv_rate,
             starting_folding_factor: folding_factor,
             folding_factors: vec![folding_factor; num_rounds],
@@ -66,8 +66,8 @@ impl StirParameters {
         }
     }
 
-    /// A STIR configuration in which the domain shrinks by (1/2) in each iteration while the degree shrinks by (1/2^folding_factor).
-    /// This is the version presented in the STIR paper.
+    /// A WHIR configuration in which the domain shrinks by (1/2) in each iteration while the degree shrinks by (1/2^folding_factor).
+    /// This is the version presented in the WHIR paper.
     pub fn fixed_domain_shift(
         log_inv_rate: usize,
         folding_factor: usize,
@@ -77,7 +77,7 @@ impl StirParameters {
         pow_bits: usize,
         digest_size_bits: usize,
     ) -> Self {
-        StirParameters {
+        WhirParameters {
             starting_log_inv_rate: log_inv_rate,
             starting_folding_factor: folding_factor,
             folding_factors: vec![folding_factor; num_rounds],
@@ -92,19 +92,16 @@ impl StirParameters {
     }
 }
 
-/// The configuration and structure of the STIR protocol.
+/// The configuration and structure of the WHIR protocol.
 #[derive(Debug, Clone)]
-pub struct StirProtocol {
-    pub config: StirConfig,
+pub struct WhirProtocol {
+    pub config: WhirConfig,
     pub protocol: Protocol,
 }
 
-impl StirProtocol {
-    /// Given a LDT parameter and some parameters for STIR, populate the config.
-    pub fn new(ldt_parameters: LowDegreeParameters, stir_parameters: StirParameters) -> Self {
-        // STIR only supports proximity testing
-        assert_eq!(ldt_parameters.constraint_degree, 0);
-
+impl WhirProtocol {
+    /// Given a LDT parameter and some parameters for WHIR, populate the config.
+    pub fn new(ldt_parameters: LowDegreeParameters, stir_parameters: WhirParameters) -> Self {
         // We need to fold at least some time
         assert!(
             stir_parameters.starting_folding_factor > 0
@@ -139,7 +136,7 @@ impl StirProtocol {
             ldt_parameters.log_degree + stir_parameters.starting_log_inv_rate;
 
         let mut protocol_builder =
-            ProtocolBuilder::new("STIR protocol", stir_parameters.digest_size_bits);
+            ProtocolBuilder::new("WHIR protocol", stir_parameters.digest_size_bits);
 
         // Pow bits for the batching steps
         let mut batching_pow_bits = 0.;
@@ -345,8 +342,8 @@ impl StirProtocol {
             )))
             .end_round();
 
-        StirProtocol {
-            config: StirConfig {
+        WhirProtocol {
+            config: WhirConfig {
                 ldt_parameters,
                 security_assumption: stir_parameters.security_assumption,
                 security_level,
@@ -367,20 +364,20 @@ impl StirProtocol {
     }
 }
 
-impl Display for StirProtocol {
+impl Display for WhirProtocol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.config.fmt(f)?;
         self.protocol.fmt(f)
     }
 }
 
-/// A fully expanded STIR configuration.
+/// A fully expanded WHIR configuration.
 #[derive(Debug, Clone)]
-pub struct StirConfig {
+pub struct WhirConfig {
     /// The configuration for the LDT desired.
     pub(crate) ldt_parameters: LowDegreeParameters,
 
-    /// The security assumption under which STIR was configured.
+    /// The security assumption under which WHIR was configured.
     pub(crate) security_assumption: SecurityAssumption,
 
     /// The desired security level.
@@ -402,7 +399,7 @@ pub struct StirConfig {
     pub(crate) starting_domain_log_size: usize,
 
     /// The initial pow bits used in the first fold.
-    pub(crate) starting_folding_pow_bits: f64,
+    pub(crate) starting_folding_pow_bits: Vec<f64>,
 
     /// The round-specific parameters.
     pub(crate) round_parameters: Vec<RoundConfig>,
@@ -428,7 +425,7 @@ pub(crate) struct RoundConfig {
     /// Size of evaluation domain (of oracle sent in this round)
     pub(crate) evaluation_domain_log_size: usize,
     /// Number of bits of proof of work (for the queries).
-    pub(crate) pow_bits: f64,
+    pub(crate) pow_bits: Vec<f64>,
     /// Number of queries in this round
     pub(crate) num_queries: usize,
     /// Number of OOD samples in this round
@@ -437,8 +434,8 @@ pub(crate) struct RoundConfig {
     pub(crate) log_inv_rate: usize,
 }
 
-impl StirConfig {
-    /// Prints a summary of the configuration for STIR.
+impl WhirConfig {
+    /// Prints a summary of the configuration for WHIR.
     pub fn print_config_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}", self.ldt_parameters)?;
         writeln!(
@@ -463,9 +460,11 @@ impl StirConfig {
 
         writeln!(
             f,
-            "Initial folding factor: {}, initial_folding_pow_bits: {:.1}",
-            self.starting_folding_factor, self.starting_folding_pow_bits
+            "Initial folding factor: {}, initial_folding_pow_bits: ",
+            self.starting_folding_factor,
         )?;
+        pretty_print_float_slice(f, &self.starting_folding_pow_bits);
+
         for r in &self.round_parameters {
             r.fmt(f)?;
         }
@@ -483,7 +482,7 @@ impl StirConfig {
     }
 }
 
-impl Display for StirConfig {
+impl Display for WhirConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.print_config_summary(f)
     }
@@ -491,10 +490,11 @@ impl Display for StirConfig {
 
 impl Display for RoundConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
+        write!(
             f,
-            "Folding factor: {}, domain_size: 2^{}, num_queries: {}, rate: 2^-{}, ood_samples: {}, pow_bits: {:.1}",
-            self.folding_factor, self.evaluation_domain_log_size, self.num_queries, self.log_inv_rate, self.ood_samples, self.pow_bits
-        )
+            "Folding factor: {}, domain_size: 2^{}, num_queries: {}, rate: 2^-{}, ood_samples: {}, pow_bits: ",
+            self.folding_factor, self.evaluation_domain_log_size, self.num_queries, self.log_inv_rate, self.ood_samples,
+        )?;
+        pretty_print_float_slice(f, &self.pow_bits)
     }
 }
