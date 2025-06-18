@@ -3,7 +3,7 @@ use stir_whir_estimation::{
     errors::SecurityAssumption,
     field::*,
     fri::{FriParameters, FriProtocol},
-    //stir::{StirParameters, StirProtocol},
+    stir::{StirParameters, StirProtocol},
     LowDegreeParameters,
 };
 
@@ -15,7 +15,6 @@ fn main() {
         constraint_degree: 0,
     };
 
-    /*
     let stir_parameters = StirParameters::fixed_domain_shift(
         1,                                 // log_inv_rate
         4,                                 // folding_factor
@@ -26,7 +25,6 @@ fn main() {
         256,                               // digest_size_bits
     );
     let stir_protocol = StirProtocol::new(ldt_parameters, stir_parameters);
-    */
 
     let fri_parameters = FriParameters::fixed_folding(
         1,                                 // log_inv_rate
@@ -59,7 +57,7 @@ fn main() {
 
     let basefold_protocol = BasefoldProtocol::new(pcs_parameters, basefold_parameters);
 
-    //println!("{}", stir_protocol);
+    println!("{}", stir_protocol);
     println!("{}", fri_protocol);
     println!("{}", basefold_protocol);
 }
