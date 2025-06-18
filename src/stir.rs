@@ -28,7 +28,7 @@ pub struct StirParameters {
     /// The rates used in the internal rounds of STIR.
     pub log_inv_rates: Vec<usize>,
 
-    /// The security assumption under which to configure FRI.
+    /// The security assumption under which to configure STIR.
     pub security_assumption: SecurityAssumption,
 
     /// The security level desired.
@@ -44,7 +44,7 @@ pub struct StirParameters {
 }
 
 impl StirParameters {
-    /// Instantiates a STIR configuration in which the rate is constant. This is a worse version of FRI.
+    /// Instantiates a STIR configuration in which the rate is constant. This is a worse version of STIR.
     pub fn fixed_rate_folding(
         log_inv_rate: usize,
         folding_factor: usize,
@@ -92,7 +92,7 @@ impl StirParameters {
     }
 }
 
-/// The configuration and structure of the FRI protocol.
+/// The configuration and structure of the STIR protocol.
 #[derive(Debug, Clone)]
 pub struct StirProtocol {
     pub config: StirConfig,
@@ -102,6 +102,9 @@ pub struct StirProtocol {
 impl StirProtocol {
     /// Given a LDT parameter and some parameters for STIR, populate the config.
     pub fn new(ldt_parameters: LowDegreeParameters, stir_parameters: StirParameters) -> Self {
+        // STIR only supports proximity testing
+        assert_eq!(ldt_parameters.constraint_degree, 0);
+
         // We need to fold at least some time
         assert!(
             stir_parameters.starting_folding_factor > 0

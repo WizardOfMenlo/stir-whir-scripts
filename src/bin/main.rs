@@ -11,6 +11,7 @@ fn main() {
         field: GOLDILOCKS_2,
         log_degree: 26,
         batch_size: 1,
+        constraint_degree: 0,
     };
 
     let stir_parameters = StirParameters::fixed_domain_shift(

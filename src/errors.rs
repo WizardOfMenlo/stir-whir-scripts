@@ -56,7 +56,20 @@ impl SecurityAssumption {
         }
     }
 
-    /// Given a RS code (specified by the log of the degree and log inv of the rate) a field_size and an arity, compute the proximity gaps error (in bits) at the specified distance
+    /// Given a RS code (specified by the log of the degree and log inv of the rate) compute the error of folding a constraint of degree constraint_degree
+    pub fn constraint_folding_error(
+        &self,
+        log_degree: usize,
+        log_inv_rate: usize,
+        field_size_bits: usize,
+        constraint_degree: usize,
+    ) -> f64 {
+        let list_size = self.list_size_bits(log_degree, log_inv_rate);
+
+        (field_size_bits as f64) - list_size * (constraint_degree as f64).log2()
+    }
+
+    /// Given a RS code (specified by the log of the degree and log inv of the rate), a field_size and an arity, compute the proximity gaps error (in bits) at the specified distance
     pub fn prox_gaps_error(
         &self,
         log_degree: usize,

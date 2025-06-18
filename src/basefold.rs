@@ -7,14 +7,14 @@ use crate::{
         proof_size::{FieldElements, MerkleQueries, MerkleTree, ProofElement},
         Protocol, ProverMessage, RbRError, VerifierMessage,
     },
-    utils::pow_util,
+    utils::{pow_util, pretty_print_float_slice},
     LowDegreeParameters,
 };
 
-/// Parameters parametrizing an instance of FRI.
-/// This does not include the entire configuration of FRI, as we populate that later on according to required security config.
+/// Parameters parametrizing an instance of Basefold.
+/// This does not include the entire configuration of Basefold, as we populate that later on according to required security config.
 #[derive(Clone)]
-pub struct FriParameters {
+pub struct BasefoldParameters {
     /// The starting rate used in the protocol.
     pub starting_log_inv_rate: usize,
 
@@ -26,7 +26,7 @@ pub struct FriParameters {
     /// Given in log form, i.e. folding_factors[i] = 2 implies that the degree in round i is reduced by a factor of 4.
     pub folding_factors: Vec<usize>,
 
-    /// The security assumption under which to configure FRI.
+    /// The security assumption under which to configure Basefold.
     pub security_assumption: SecurityAssumption,
 
     /// The security level desired.
@@ -41,8 +41,8 @@ pub struct FriParameters {
     pub digest_size_bits: usize,
 }
 
-impl FriParameters {
-    /// Instantiate a FRI configuration where each round does a fixed amount of folding.
+impl BasefoldParameters {
+    /// Instantiate a Basefold configuration where each round does a fixed amount of folding.
     pub fn fixed_folding(
         log_inv_rate: usize,
         folding_factor: usize,
@@ -52,7 +52,7 @@ impl FriParameters {
         pow_bits: usize,
         digest_size_bits: usize,
     ) -> Self {
-        FriParameters {
+        BasefoldParameters {
             starting_log_inv_rate: log_inv_rate,
             starting_folding_factor: folding_factor,
             folding_factors: vec![folding_factor; num_rounds],
@@ -64,57 +64,59 @@ impl FriParameters {
     }
 }
 
-/// The configuration and structure of the FRI protocol.
+/// The configuration and structure of the Basefold protocol.
 #[derive(Debug, Clone)]
-pub struct FriProtocol {
-    pub config: FriConfig,
+pub struct BasefoldProtocol {
+    pub config: BasefoldConfig,
     pub protocol: Protocol,
 }
 
-impl FriProtocol {
-    /// Given a LDT parameter and some parameters for FRI, populate the config.
-    pub fn new(ldt_parameters: LowDegreeParameters, fri_parameters: FriParameters) -> Self {
-        // FRI only supports proximity testing
-        assert_eq!(ldt_parameters.constraint_degree, 0);
-
+impl BasefoldProtocol {
+    /// Given a LDT parameter and some parameters for Basefold, populate the config.
+    pub fn new(
+        ldt_parameters: LowDegreeParameters,
+        basefold_parameters: BasefoldParameters,
+    ) -> Self {
         // We need to fold at least some time
         assert!(
-            fri_parameters.starting_folding_factor > 0
-                && fri_parameters.folding_factors.iter().all(|&x| x > 0),
+            basefold_parameters.starting_folding_factor > 0
+                && basefold_parameters.folding_factors.iter().all(|&x| x > 0),
             "folding factors should be non zero"
         );
 
         // We cannot fold too much
-        let total_reduction = fri_parameters.starting_folding_factor
-            + fri_parameters.folding_factors.iter().sum::<usize>();
+        let total_reduction = basefold_parameters.starting_folding_factor
+            + basefold_parameters.folding_factors.iter().sum::<usize>();
         assert!(total_reduction <= ldt_parameters.log_degree);
 
         // If less, just send the damn polynomials
-        assert!(ldt_parameters.log_degree >= fri_parameters.folding_factors[0]);
+        assert!(ldt_parameters.log_degree >= basefold_parameters.folding_factors[0]);
 
         // Compute the number of rounds and the leftover
         let final_log_degree = ldt_parameters.log_degree - total_reduction;
-        let num_rounds = fri_parameters.folding_factors.len();
+        let num_rounds = basefold_parameters.folding_factors.len();
 
         // Compute the security level
-        let security_level = fri_parameters.security_level;
+        let security_level = basefold_parameters.security_level;
         let protocol_security_level =
-            0.max(fri_parameters.security_level - fri_parameters.pow_bits);
+            0.max(basefold_parameters.security_level - basefold_parameters.pow_bits);
 
         // Initial domain size (the trace domain)
-        let starting_folding_factor = fri_parameters.starting_folding_factor;
+        let starting_folding_factor = basefold_parameters.starting_folding_factor;
         let starting_domain_log_size =
-            ldt_parameters.log_degree + fri_parameters.starting_log_inv_rate;
+            ldt_parameters.log_degree + basefold_parameters.starting_log_inv_rate;
 
         let mut protocol_builder =
-            ProtocolBuilder::new("FRI protocol", fri_parameters.digest_size_bits);
+            ProtocolBuilder::new("Basefold protocol", basefold_parameters.digest_size_bits);
 
         // Pow bits for the batching steps
         let mut batching_pow_bits = 0.;
         if ldt_parameters.batch_size > 1 {
-            let prox_gaps_error_batching = fri_parameters.security_assumption.prox_gaps_error(
+            // We can't really batch non linear constraints
+            assert!(ldt_parameters.constraint_degree <= 2);
+            let prox_gaps_error_batching = basefold_parameters.security_assumption.prox_gaps_error(
                 ldt_parameters.log_degree,
-                fri_parameters.starting_log_inv_rate,
+                basefold_parameters.starting_log_inv_rate,
                 ldt_parameters.field.extension_bit_size(),
                 ldt_parameters.batch_size,
             ); // We now start, the initial folding pow bits
@@ -140,32 +142,53 @@ impl FriProtocol {
         let mut commitments = vec![starting_merkle_tree];
 
         // Degree of next polynomial to send
-        let mut current_log_degree = ldt_parameters.log_degree - starting_folding_factor;
+        let mut current_log_degree = ldt_parameters.log_degree;
+        let mut starting_folding_pow_bits_vec = Vec::with_capacity(starting_folding_factor);
+        protocol_builder = protocol_builder.start_round("initial_iteration");
+        for i in 0..starting_folding_factor {
+            // We now start, the initial folding pow bits
+            let prox_gaps_error = basefold_parameters.security_assumption.prox_gaps_error(
+                current_log_degree - 1,
+                basefold_parameters.starting_log_inv_rate,
+                ldt_parameters.field.extension_bit_size(),
+                2,
+            );
 
-        // We now start, the initial folding pow bits
-        let starting_folding_prox_gaps_error = fri_parameters.security_assumption.prox_gaps_error(
-            current_log_degree,
-            fri_parameters.starting_log_inv_rate,
-            ldt_parameters.field.extension_bit_size(),
-            1 << starting_folding_factor,
-        );
-        let starting_folding_pow_bits = pow_util(security_level, starting_folding_prox_gaps_error);
-        protocol_builder = protocol_builder
-            .start_round("initial_iteration")
-            .verifier_message(VerifierMessage::new(
-                vec![RbRError::new(
-                    "folding_error",
-                    starting_folding_prox_gaps_error,
-                )],
-                starting_folding_pow_bits,
-            ))
-            .end_round();
+            let sumcheck_error = basefold_parameters
+                .security_assumption
+                .constraint_folding_error(
+                    current_log_degree,
+                    basefold_parameters.starting_log_inv_rate,
+                    ldt_parameters.field.extension_bit_size(),
+                    ldt_parameters.constraint_degree,
+                );
+
+            let starting_folding_pow_bits =
+                pow_util(security_level, prox_gaps_error.min(sumcheck_error));
+
+            protocol_builder = protocol_builder
+                .prover_message(ProverMessage::new(ProofElement::FieldElements(
+                    FieldElements {
+                        field: ldt_parameters.field,
+                        num_elements: ldt_parameters.constraint_degree + 1,
+                        is_extension: true,
+                    },
+                )))
+                .verifier_message(VerifierMessage::new(
+                    vec![RbRError::new("folding_error", prox_gaps_error)],
+                    starting_folding_pow_bits,
+                ));
+
+            starting_folding_pow_bits_vec.push(starting_folding_pow_bits);
+            current_log_degree -= 1;
+        }
+        protocol_builder = protocol_builder.end_round();
 
         let mut round_parameters = Vec::with_capacity(num_rounds);
 
-        for folding_factor in fri_parameters.folding_factors.into_iter() {
+        for folding_factor in basefold_parameters.folding_factors.into_iter() {
             let new_evaluation_domain_size =
-                current_log_degree + fri_parameters.starting_log_inv_rate;
+                current_log_degree + basefold_parameters.starting_log_inv_rate;
 
             // Send the new oracle
             let current_merkle_tree = MerkleTree::new(
@@ -175,15 +198,15 @@ impl FriProtocol {
                 true,
             );
             protocol_builder = protocol_builder
-                .start_round("fri_iteration")
+                .start_round("basefold_iteration")
                 .prover_message(ProverMessage::new(ProofElement::MerkleRoot(
                     current_merkle_tree,
                 )));
             commitments.push(current_merkle_tree);
 
-            let prox_gaps_error = fri_parameters.security_assumption.prox_gaps_error(
+            let prox_gaps_error = basefold_parameters.security_assumption.prox_gaps_error(
                 current_log_degree - folding_factor,
-                fri_parameters.starting_log_inv_rate,
+                basefold_parameters.starting_log_inv_rate,
                 ldt_parameters.field.extension_bit_size(),
                 1 << folding_factor,
             );
@@ -209,15 +232,15 @@ impl FriProtocol {
         }
 
         // Compute the number of queries required
-        let final_queries = fri_parameters.security_assumption.queries(
+        let final_queries = basefold_parameters.security_assumption.queries(
             protocol_security_level,
-            fri_parameters.starting_log_inv_rate,
+            basefold_parameters.starting_log_inv_rate,
         );
 
         // We need to compute the errors, to compute the according PoW
-        let query_error = fri_parameters
+        let query_error = basefold_parameters
             .security_assumption
-            .queries_error(fri_parameters.starting_log_inv_rate, final_queries);
+            .queries_error(basefold_parameters.starting_log_inv_rate, final_queries);
 
         // Now compute the PoW
         let final_pow_bits = pow_util(security_level, query_error);
@@ -246,17 +269,17 @@ impl FriProtocol {
             ));
         }
 
-        FriProtocol {
-            config: FriConfig {
+        BasefoldProtocol {
+            config: BasefoldConfig {
                 ldt_parameters,
-                security_assumption: fri_parameters.security_assumption,
+                security_assumption: basefold_parameters.security_assumption,
                 security_level,
-                max_pow_bits: fri_parameters.pow_bits,
+                max_pow_bits: basefold_parameters.pow_bits,
                 batching_pow_bits,
                 starting_folding_factor,
                 starting_domain_log_size,
-                log_inv_rate: fri_parameters.starting_log_inv_rate,
-                starting_folding_pow_bits,
+                log_inv_rate: basefold_parameters.starting_log_inv_rate,
+                starting_folding_pow_bits: starting_folding_pow_bits_vec,
                 round_parameters,
                 queries: final_queries,
                 pow_bits: final_pow_bits,
@@ -267,20 +290,20 @@ impl FriProtocol {
     }
 }
 
-impl Display for FriProtocol {
+impl Display for BasefoldProtocol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.config.fmt(f)?;
         self.protocol.fmt(f)
     }
 }
 
-/// A fully expanded FRI configuration.
+/// A fully expanded Basefold configuration.
 #[derive(Debug, Clone)]
-pub struct FriConfig {
+pub struct BasefoldConfig {
     /// The configuration for the LDT desired.
     pub ldt_parameters: LowDegreeParameters,
 
-    /// The security assumption under which FRI was configured.
+    /// The security assumption under which Basefold was configured.
     pub security_assumption: SecurityAssumption,
 
     /// The desired security level.
@@ -300,7 +323,7 @@ pub struct FriConfig {
     /// The initial domain size
     pub starting_domain_log_size: usize,
     /// The initial pow bits used in the first fold.
-    pub starting_folding_pow_bits: f64,
+    pub starting_folding_pow_bits: Vec<f64>,
 
     /// The round-specific parameters.
     pub round_parameters: Vec<RoundConfig>,
@@ -308,7 +331,7 @@ pub struct FriConfig {
     /// Degree of the final polynomial sent over.
     pub final_poly_log_degree: usize,
 
-    /// Number of FRI queries
+    /// Number of Basefold queries
     pub queries: usize,
 
     /// Number of bits of proof of work (for the queries).
@@ -326,8 +349,8 @@ pub struct RoundConfig {
     pub folding_pow_bits: f64,
 }
 
-impl FriConfig {
-    // Prints a summary of the configuration for FRI.
+impl BasefoldConfig {
+    // Prints a summary of the configuration for Basefold.
     pub fn print_config_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}", self.ldt_parameters)?;
         writeln!(
@@ -350,11 +373,13 @@ impl FriConfig {
             )?;
         }
 
-        writeln!(
+        write!(
             f,
-            "Initial folding factor: {}, initial_folding_pow_bits: {:.1}",
-            self.starting_folding_factor, self.starting_folding_pow_bits
+            "Initial folding factor: {}, initial_folding_pow_bits: ",
+            self.starting_folding_factor,
         )?;
+        pretty_print_float_slice(f, &self.starting_folding_pow_bits)?;
+
         for r in &self.round_parameters {
             r.fmt(f)?;
         }
@@ -369,7 +394,7 @@ impl FriConfig {
     }
 }
 
-impl Display for FriConfig {
+impl Display for BasefoldConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.print_config_summary(f)
     }
