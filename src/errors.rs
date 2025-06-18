@@ -93,7 +93,7 @@ impl SecurityAssumption {
                 numerator + 7. * (sqrt_rho_20.min(-log_eta) - 1.)
             }
 
-            // In JB we assume the error is degree/η*ρ^2
+            // In CB we assume the error is degree/η*ρ^2
             Self::CapacityBound => (log_degree + 2 * log_inv_rate) as f64 - log_eta,
         };
 

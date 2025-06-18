@@ -75,6 +75,10 @@ impl MerkleQueries {
     /// Includes path pruning done to deduplicate and reduce proof size.
     pub fn copath_elements(&self) -> usize {
         let log_num_openings = (self.num_openings as f64).log2().ceil() as usize;
+        // If we are opening the entire tree, just don't send anything
+        if log_num_openings >= self.merkle_tree.tree_depth {
+            return 0;
+        }
 
         self.num_openings * (self.merkle_tree.tree_depth - log_num_openings)
     }

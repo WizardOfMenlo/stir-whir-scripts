@@ -145,7 +145,7 @@ impl BasefoldProtocol {
         let mut current_log_degree = ldt_parameters.log_degree;
         let mut starting_folding_pow_bits_vec = Vec::with_capacity(starting_folding_factor);
         protocol_builder = protocol_builder.start_round("initial_iteration");
-        for i in 0..starting_folding_factor {
+        for _ in 0..starting_folding_factor {
             // We now start, the initial folding pow bits
             let prox_gaps_error = basefold_parameters.security_assumption.prox_gaps_error(
                 current_log_degree - 1,
@@ -175,7 +175,10 @@ impl BasefoldProtocol {
                     },
                 )))
                 .verifier_message(VerifierMessage::new(
-                    vec![RbRError::new("folding_error", prox_gaps_error)],
+                    vec![
+                        RbRError::new("folding_error", prox_gaps_error),
+                        RbRError::new("sumcheck_error", sumcheck_error),
+                    ],
                     starting_folding_pow_bits,
                 ));
 
@@ -204,31 +207,55 @@ impl BasefoldProtocol {
                 )));
             commitments.push(current_merkle_tree);
 
-            let prox_gaps_error = basefold_parameters.security_assumption.prox_gaps_error(
-                current_log_degree - folding_factor,
-                basefold_parameters.starting_log_inv_rate,
-                ldt_parameters.field.extension_bit_size(),
-                1 << folding_factor,
-            );
+            let mut pow_bits_vec = Vec::with_capacity(folding_factor);
+            for _ in 0..folding_factor {
+                // We now start, the initial folding pow bits
+                let prox_gaps_error = basefold_parameters.security_assumption.prox_gaps_error(
+                    current_log_degree - 1,
+                    basefold_parameters.starting_log_inv_rate,
+                    ldt_parameters.field.extension_bit_size(),
+                    2,
+                );
 
-            // Now compute the PoW
-            let pow_bits = pow_util(security_level, prox_gaps_error);
+                let sumcheck_error = basefold_parameters
+                    .security_assumption
+                    .constraint_folding_error(
+                        current_log_degree,
+                        basefold_parameters.starting_log_inv_rate,
+                        ldt_parameters.field.extension_bit_size(),
+                        ldt_parameters.constraint_degree,
+                    );
 
-            protocol_builder = protocol_builder
-                .verifier_message(VerifierMessage::new(
-                    vec![RbRError::new("folding_error", prox_gaps_error)],
-                    pow_bits,
-                ))
-                .end_round();
+                let starting_folding_pow_bits =
+                    pow_util(security_level, prox_gaps_error.min(sumcheck_error));
+
+                protocol_builder = protocol_builder
+                    .prover_message(ProverMessage::new(ProofElement::FieldElements(
+                        FieldElements {
+                            field: ldt_parameters.field,
+                            num_elements: ldt_parameters.constraint_degree + 1,
+                            is_extension: true,
+                        },
+                    )))
+                    .verifier_message(VerifierMessage::new(
+                        vec![
+                            RbRError::new("folding_error", prox_gaps_error),
+                            RbRError::new("sumcheck_error", sumcheck_error),
+                        ],
+                        starting_folding_pow_bits,
+                    ));
+
+                pow_bits_vec.push(starting_folding_pow_bits);
+                current_log_degree -= 1;
+            }
+            protocol_builder = protocol_builder.end_round();
 
             let round_config = RoundConfig {
                 evaluation_domain_log_size: new_evaluation_domain_size,
                 folding_factor,
-                folding_pow_bits: pow_bits,
+                folding_pow_bits: pow_bits_vec,
             };
             round_parameters.push(round_config);
-
-            current_log_degree -= folding_factor;
         }
 
         // Compute the number of queries required
@@ -346,7 +373,7 @@ pub struct RoundConfig {
     /// Size of evaluation domain.
     pub evaluation_domain_log_size: usize,
     /// Number of folding pow_bits.
-    pub folding_pow_bits: f64,
+    pub folding_pow_bits: Vec<f64>,
 }
 
 impl BasefoldConfig {
@@ -402,10 +429,11 @@ impl Display for BasefoldConfig {
 
 impl Display for RoundConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
+        write!(
             f,
-            "Folding factor: {}, domain_size: 2^{}, folding_pow_bits: {:.1}",
-            self.folding_factor, self.evaluation_domain_log_size, self.folding_pow_bits,
-        )
+            "Folding factor: {}, domain_size: 2^{}, folding_pow_bits: ",
+            self.folding_factor, self.evaluation_domain_log_size,
+        )?;
+        pretty_print_float_slice(f, &self.folding_pow_bits)
     }
 }
