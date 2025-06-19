@@ -219,10 +219,11 @@ impl WhirProtocol {
 
         let mut round_parameters = Vec::with_capacity(num_rounds);
 
-        for (folding_factor, next_rate) in whir_parameters
+        for (i, (folding_factor, next_rate)) in whir_parameters
             .folding_factors
             .into_iter()
             .zip(whir_parameters.log_inv_rates)
+            .enumerate()
         {
             // This is the size of the new evaluation domain
             let new_evaluation_domain_size = current_log_degree + next_rate;
@@ -308,8 +309,13 @@ impl WhirProtocol {
                         num_openings: num_queries,
                     },
                 )))
-                .end_round()
-                .start_round("whir_iteration");
+                .end_round();
+
+            protocol_builder = protocol_builder.start_round(if i != num_rounds - 1 {
+                "whir_iteration"
+            } else {
+                "final_sumcheck"
+            });
 
             let mut pow_bits_vec = Vec::with_capacity(folding_factor);
             for _ in 0..folding_factor {
