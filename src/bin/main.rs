@@ -1,8 +1,10 @@
 use stir_whir_estimation::{
+    basefold::{BasefoldParameters, BasefoldProtocol},
     errors::SecurityAssumption,
     field::*,
     fri::{FriParameters, FriProtocol},
     stir::{StirParameters, StirProtocol},
+    whir::{WhirParameters, WhirProtocol},
     LowDegreeParameters,
 };
 
@@ -11,6 +13,7 @@ fn main() {
         field: GOLDILOCKS_2,
         log_degree: 26,
         batch_size: 1,
+        constraint_degree: 0,
     };
 
     let stir_parameters = StirParameters::fixed_domain_shift(
@@ -36,6 +39,38 @@ fn main() {
 
     let fri_protocol = FriProtocol::new(ldt_parameters, fri_parameters);
 
+    let pcs_parameters = LowDegreeParameters {
+        field: GOLDILOCKS_2,
+        log_degree: 26,
+        batch_size: 1,
+        constraint_degree: 2,
+    };
+
+    let basefold_parameters = BasefoldParameters::fixed_folding(
+        1,                                 // log_inv_rate
+        4,                                 // folding_factor
+        4,                                 // num_rounds
+        SecurityAssumption::CapacityBound, // security_assumption
+        100,                               // security_level
+        20,                                // pow_bits
+        256,                               // digest_size_bits
+    );
+
+    let basefold_protocol = BasefoldProtocol::new(pcs_parameters, basefold_parameters);
+
+    let whir_parameters = WhirParameters::fixed_domain_shift(
+        1,                                 // log_inv_rate
+        4,                                 // folding_factor
+        4,                                 // num_rounds
+        SecurityAssumption::CapacityBound, // security_assumption
+        100,                               // security_level
+        20,                                // pow_bits
+        256,                               // digest_size_bits
+    );
+    let whir_protocol = WhirProtocol::new(pcs_parameters, whir_parameters);
+
     println!("{}", stir_protocol);
     println!("{}", fri_protocol);
+    println!("{}", basefold_protocol);
+    println!("{}", whir_protocol);
 }

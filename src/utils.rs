@@ -26,7 +26,7 @@ pub(crate) fn pretty_print_float_slice(f: &mut fmt::Formatter<'_>, v: &[f64]) ->
         if i > 0 {
             write!(f, ", ")?;
         }
-        write!(f, "{:.2}", value)?;
+        write!(f, "{:.1}", value)?;
     }
     writeln!(f, "]")
 }
