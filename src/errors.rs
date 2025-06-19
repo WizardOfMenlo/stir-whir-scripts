@@ -66,7 +66,7 @@ impl SecurityAssumption {
     ) -> f64 {
         let list_size = self.list_size_bits(log_degree, log_inv_rate);
 
-        (field_size_bits as f64) - list_size * (constraint_degree as f64).log2()
+        (field_size_bits as f64) - list_size - (constraint_degree as f64).log2()
     }
 
     /// Given a RS code (specified by the log of the degree and log inv of the rate), a field_size and an arity, compute the proximity gaps error (in bits) at the specified distance

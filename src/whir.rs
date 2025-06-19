@@ -189,7 +189,7 @@ impl WhirProtocol {
                 .constraint_folding_error(
                     current_log_degree,
                     log_inv_rate,
-                    ldt_parameters.field.extension_degree,
+                    ldt_parameters.field.extension_bit_size(),
                     ldt_parameters.constraint_degree,
                 );
 
@@ -288,7 +288,7 @@ impl WhirProtocol {
                 .constraint_folding_error(
                     current_log_degree,
                     log_inv_rate,
-                    ldt_parameters.field.field_size_bits,
+                    ldt_parameters.field.extension_bit_size(),
                     num_terms,
                 );
 
