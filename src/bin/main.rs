@@ -4,6 +4,7 @@ use stir_whir_estimation::{
     field::*,
     fri::{FriParameters, FriProtocol},
     stir::{StirParameters, StirProtocol},
+    whir::{WhirParameters, WhirProtocol},
     LowDegreeParameters,
 };
 
@@ -57,7 +58,19 @@ fn main() {
 
     let basefold_protocol = BasefoldProtocol::new(pcs_parameters, basefold_parameters);
 
+    let whir_parameters = WhirParameters::fixed_domain_shift(
+        1,                                 // log_inv_rate
+        4,                                 // folding_factor
+        4,                                 // num_rounds
+        SecurityAssumption::CapacityBound, // security_assumption
+        100,                               // security_level
+        20,                                // pow_bits
+        256,                               // digest_size_bits
+    );
+    let whir_protocol = WhirProtocol::new(pcs_parameters, whir_parameters);
+
     println!("{}", stir_protocol);
     println!("{}", fri_protocol);
     println!("{}", basefold_protocol);
+    println!("{}", whir_protocol);
 }

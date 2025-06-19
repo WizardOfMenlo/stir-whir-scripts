@@ -101,49 +101,49 @@ pub struct WhirProtocol {
 
 impl WhirProtocol {
     /// Given a LDT parameter and some parameters for WHIR, populate the config.
-    pub fn new(ldt_parameters: LowDegreeParameters, stir_parameters: WhirParameters) -> Self {
+    pub fn new(ldt_parameters: LowDegreeParameters, whir_parameters: WhirParameters) -> Self {
         // We need to fold at least some time
         assert!(
-            stir_parameters.starting_folding_factor > 0
-                && stir_parameters.folding_factors.iter().all(|&x| x > 0),
+            whir_parameters.starting_folding_factor > 0
+                && whir_parameters.folding_factors.iter().all(|&x| x > 0),
             "folding factors should be non zero"
         );
         assert_eq!(
-            stir_parameters.folding_factors.len(),
-            stir_parameters.log_inv_rates.len()
+            whir_parameters.folding_factors.len(),
+            whir_parameters.log_inv_rates.len()
         );
 
         // We cannot fold too much
-        let total_reduction = stir_parameters.starting_folding_factor
-            + stir_parameters.folding_factors.iter().sum::<usize>();
+        let total_reduction = whir_parameters.starting_folding_factor
+            + whir_parameters.folding_factors.iter().sum::<usize>();
         assert!(total_reduction <= ldt_parameters.log_degree);
 
         // If less, just send the damn polynomials
-        assert!(ldt_parameters.log_degree >= stir_parameters.folding_factors[0]);
+        assert!(ldt_parameters.log_degree >= whir_parameters.folding_factors[0]);
 
         // Compute the number of rounds and the leftover
         let final_log_degree = ldt_parameters.log_degree - total_reduction;
-        let num_rounds = stir_parameters.folding_factors.len();
+        let num_rounds = whir_parameters.folding_factors.len();
 
         // Compute the security level
-        let security_level = stir_parameters.security_level;
+        let security_level = whir_parameters.security_level;
         let protocol_security_level =
-            0.max(stir_parameters.security_level - stir_parameters.pow_bits);
+            0.max(whir_parameters.security_level - whir_parameters.pow_bits);
 
         // Initial domain size (the trace domain)
-        let starting_folding_factor = stir_parameters.starting_folding_factor;
+        let starting_folding_factor = whir_parameters.starting_folding_factor;
         let starting_domain_log_size =
-            ldt_parameters.log_degree + stir_parameters.starting_log_inv_rate;
+            ldt_parameters.log_degree + whir_parameters.starting_log_inv_rate;
 
         let mut protocol_builder =
-            ProtocolBuilder::new("WHIR protocol", stir_parameters.digest_size_bits);
+            ProtocolBuilder::new("WHIR protocol", whir_parameters.digest_size_bits);
 
         // Pow bits for the batching steps
         let mut batching_pow_bits = 0.;
         if ldt_parameters.batch_size > 1 {
-            let prox_gaps_error_batching = stir_parameters.security_assumption.prox_gaps_error(
+            let prox_gaps_error_batching = whir_parameters.security_assumption.prox_gaps_error(
                 ldt_parameters.log_degree,
-                stir_parameters.starting_log_inv_rate,
+                whir_parameters.starting_log_inv_rate,
                 ldt_parameters.field.extension_bit_size(),
                 ldt_parameters.batch_size,
             ); // We now start, the initial folding pow bits
@@ -168,34 +168,61 @@ impl WhirProtocol {
         );
 
         // Degree of next polynomial to send
-        let mut current_log_degree = ldt_parameters.log_degree - starting_folding_factor;
-        let mut log_inv_rate = stir_parameters.starting_log_inv_rate;
+        let mut current_log_degree = ldt_parameters.log_degree;
+        let mut log_inv_rate = whir_parameters.starting_log_inv_rate;
 
-        // We now start, the initial folding pow bits
-        let starting_folding_prox_gaps_error = stir_parameters.security_assumption.prox_gaps_error(
-            current_log_degree,
-            log_inv_rate,
-            ldt_parameters.field.extension_bit_size(),
-            1 << starting_folding_factor,
-        );
-        let starting_folding_pow_bits = pow_util(security_level, starting_folding_prox_gaps_error);
-        protocol_builder = protocol_builder
-            .start_round("initial_iteration")
-            .verifier_message(VerifierMessage::new(
-                vec![RbRError::new(
-                    "folding_error",
-                    starting_folding_prox_gaps_error,
-                )],
-                starting_folding_pow_bits,
-            ))
-            .end_round();
+        let mut starting_folding_pow_bits_vec =
+            Vec::with_capacity(whir_parameters.starting_folding_factor);
+
+        protocol_builder = protocol_builder.start_round("whir_iteration");
+        for _ in 0..whir_parameters.starting_folding_factor {
+            // We now start, the initial folding pow bits
+            let prox_gaps_error = whir_parameters.security_assumption.prox_gaps_error(
+                current_log_degree - 1,
+                log_inv_rate,
+                ldt_parameters.field.extension_bit_size(),
+                1 << starting_folding_factor,
+            );
+
+            let sumcheck_error = whir_parameters
+                .security_assumption
+                .constraint_folding_error(
+                    current_log_degree,
+                    log_inv_rate,
+                    ldt_parameters.field.extension_degree,
+                    ldt_parameters.constraint_degree,
+                );
+
+            let starting_folding_pow_bits =
+                pow_util(security_level, prox_gaps_error.min(sumcheck_error));
+
+            protocol_builder = protocol_builder
+                .prover_message(ProverMessage::new(ProofElement::FieldElements(
+                    FieldElements {
+                        field: ldt_parameters.field,
+                        num_elements: ldt_parameters.constraint_degree + 1,
+                        is_extension: true,
+                    },
+                )))
+                .verifier_message(VerifierMessage::new(
+                    vec![
+                        RbRError::new("folding_error", prox_gaps_error),
+                        RbRError::new("sumcheck_error", sumcheck_error),
+                    ],
+                    starting_folding_pow_bits,
+                ));
+
+            starting_folding_pow_bits_vec.push(starting_folding_pow_bits);
+            current_log_degree -= 1;
+        }
+        //protocol_builder = protocol_builder.end_round();
 
         let mut round_parameters = Vec::with_capacity(num_rounds);
 
-        for (folding_factor, next_rate) in stir_parameters
+        for (folding_factor, next_rate) in whir_parameters
             .folding_factors
             .into_iter()
-            .zip(stir_parameters.log_inv_rates)
+            .zip(whir_parameters.log_inv_rates)
         {
             // This is the size of the new evaluation domain
             let new_evaluation_domain_size = current_log_degree + next_rate;
@@ -208,13 +235,13 @@ impl WhirProtocol {
                 true,
             );
             protocol_builder = protocol_builder
-                .start_round("stir_iteration")
+                //.start_round("stir_iteration")
                 .prover_message(ProverMessage::new(ProofElement::MerkleRoot(
                     next_merkle_tree,
                 )));
 
             // Compute the ood samples required
-            let ood_samples = stir_parameters.security_assumption.determine_ood_samples(
+            let ood_samples = whir_parameters.security_assumption.determine_ood_samples(
                 security_level,
                 current_log_degree,
                 next_rate,
@@ -223,7 +250,7 @@ impl WhirProtocol {
 
             // Add OOD rounds to protocol
             if ood_samples > 0 {
-                let ood_error = stir_parameters.security_assumption.ood_error(
+                let ood_error = whir_parameters.security_assumption.ood_error(
                     current_log_degree,
                     next_rate,
                     ldt_parameters.field.extension_bit_size(),
@@ -245,42 +272,33 @@ impl WhirProtocol {
             }
 
             // Compute the number of queries required
-            let num_queries = stir_parameters
+            let num_queries = whir_parameters
                 .security_assumption
                 .queries(protocol_security_level, log_inv_rate);
 
             // We need to compute the errors, to compute the according PoW
-            let query_error = stir_parameters
+            let query_error = whir_parameters
                 .security_assumption
                 .queries_error(log_inv_rate, num_queries);
 
             let num_terms = num_queries + ood_samples;
-            let prox_gaps_error_1 = stir_parameters.security_assumption.prox_gaps_error(
-                current_log_degree,
-                next_rate,
-                ldt_parameters.field.extension_bit_size(),
-                num_terms,
-            );
-
-            let prox_gaps_error_2 = stir_parameters.security_assumption.prox_gaps_error(
-                current_log_degree - folding_factor,
-                next_rate,
-                ldt_parameters.field.extension_bit_size(),
-                1 << folding_factor,
-            );
+            let batching_error = whir_parameters
+                .security_assumption
+                .constraint_folding_error(
+                    current_log_degree,
+                    log_inv_rate,
+                    ldt_parameters.field.field_size_bits,
+                    num_terms,
+                );
 
             // Now compute the PoW
-            let pow_bits = pow_util(
-                security_level,
-                query_error.min(prox_gaps_error_1).min(prox_gaps_error_2),
-            );
+            let pow_bits = pow_util(security_level, query_error.min(batching_error));
 
             protocol_builder = protocol_builder
                 .verifier_message(VerifierMessage::new(
                     vec![
                         RbRError::new("query_error", query_error),
-                        RbRError::new("prox_gaps_error_1", prox_gaps_error_1),
-                        RbRError::new("prox_gaps_error_2", prox_gaps_error_2),
+                        RbRError::new("batching_error", batching_error),
                     ],
                     pow_bits,
                 ))
@@ -290,13 +308,55 @@ impl WhirProtocol {
                         num_openings: num_queries,
                     },
                 )))
-                .end_round();
+                .end_round()
+                .start_round("whir_iteration");
 
+            let mut pow_bits_vec = Vec::with_capacity(folding_factor);
+            for _ in 0..folding_factor {
+                // We now start, the initial folding pow bits
+                let prox_gaps_error = whir_parameters.security_assumption.prox_gaps_error(
+                    current_log_degree - 1,
+                    next_rate,
+                    ldt_parameters.field.extension_bit_size(),
+                    2,
+                );
+
+                let sumcheck_error = whir_parameters
+                    .security_assumption
+                    .constraint_folding_error(
+                        current_log_degree,
+                        next_rate,
+                        ldt_parameters.field.extension_bit_size(),
+                        ldt_parameters.constraint_degree.max(2),
+                    );
+
+                let starting_folding_pow_bits =
+                    pow_util(security_level, prox_gaps_error.min(sumcheck_error));
+
+                protocol_builder = protocol_builder
+                    .prover_message(ProverMessage::new(ProofElement::FieldElements(
+                        FieldElements {
+                            field: ldt_parameters.field,
+                            num_elements: ldt_parameters.constraint_degree + 1,
+                            is_extension: true,
+                        },
+                    )))
+                    .verifier_message(VerifierMessage::new(
+                        vec![
+                            RbRError::new("folding_error", prox_gaps_error),
+                            RbRError::new("sumcheck_error", sumcheck_error),
+                        ],
+                        starting_folding_pow_bits,
+                    ));
+
+                pow_bits_vec.push(starting_folding_pow_bits);
+                current_log_degree -= 1;
+            }
             let round_config = RoundConfig {
                 evaluation_domain_log_size: new_evaluation_domain_size,
                 folding_factor,
                 num_queries,
-                pow_bits,
+                pow_bits: pow_bits_vec,
                 ood_samples,
                 log_inv_rate,
             };
@@ -304,16 +364,16 @@ impl WhirProtocol {
 
             current_merkle_tree = next_merkle_tree;
             log_inv_rate = next_rate;
-            current_log_degree -= folding_factor;
         }
+        protocol_builder = protocol_builder.end_round();
 
         // Compute the number of queries required
-        let final_queries = stir_parameters
+        let final_queries = whir_parameters
             .security_assumption
             .queries(protocol_security_level, log_inv_rate);
 
         // We need to compute the errors, to compute the according PoW
-        let query_error = stir_parameters
+        let query_error = whir_parameters
             .security_assumption
             .queries_error(log_inv_rate, final_queries);
 
@@ -345,14 +405,14 @@ impl WhirProtocol {
         WhirProtocol {
             config: WhirConfig {
                 ldt_parameters,
-                security_assumption: stir_parameters.security_assumption,
+                security_assumption: whir_parameters.security_assumption,
                 security_level,
-                max_pow_bits: stir_parameters.pow_bits,
+                max_pow_bits: whir_parameters.pow_bits,
                 batching_pow_bits,
                 starting_folding_factor,
                 starting_domain_log_size,
-                starting_log_inv_rate: stir_parameters.starting_log_inv_rate,
-                starting_folding_pow_bits,
+                starting_log_inv_rate: whir_parameters.starting_log_inv_rate,
+                starting_folding_pow_bits: starting_folding_pow_bits_vec,
                 round_parameters,
                 final_queries,
                 final_pow_bits,
@@ -463,7 +523,7 @@ impl WhirConfig {
             "Initial folding factor: {}, initial_folding_pow_bits: ",
             self.starting_folding_factor,
         )?;
-        pretty_print_float_slice(f, &self.starting_folding_pow_bits);
+        pretty_print_float_slice(f, &self.starting_folding_pow_bits)?;
 
         for r in &self.round_parameters {
             r.fmt(f)?;
