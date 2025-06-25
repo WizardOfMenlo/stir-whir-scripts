@@ -30,3 +30,18 @@ pub(crate) fn pretty_print_float_slice(f: &mut fmt::Formatter<'_>, v: &[f64]) ->
     }
     writeln!(f, "]")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::display_size;
+
+    #[test]
+    fn test_display_size_zero() {
+        assert_eq!(display_size(0), "0B");
+    }
+
+    #[test]
+    fn test_display_size_one_kb() {
+        assert_eq!(display_size(8 * 1024), "1 KB");
+    }
+}
