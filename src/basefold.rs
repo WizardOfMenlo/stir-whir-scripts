@@ -119,7 +119,7 @@ impl BasefoldProtocol {
                 basefold_parameters.starting_log_inv_rate,
                 ldt_parameters.field.extension_bit_size(),
                 ldt_parameters.batch_size,
-            ); // We now start, the initial folding pow bits
+            ); // we now start, the initial folding pow bits
             batching_pow_bits = pow_util(security_level, prox_gaps_error_batching);
 
             // Add the round for the batching
@@ -137,7 +137,7 @@ impl BasefoldProtocol {
             starting_domain_log_size - starting_folding_factor,
             ldt_parameters.field,
             (1 << starting_folding_factor) * ldt_parameters.batch_size,
-            false, // First tree is over the base
+            false, // first tree is over the base
         );
         let mut commitments = vec![starting_merkle_tree];
 
@@ -146,7 +146,7 @@ impl BasefoldProtocol {
         let mut starting_folding_pow_bits_vec = Vec::with_capacity(starting_folding_factor);
         protocol_builder = protocol_builder.start_round("initial_iteration");
         for _ in 0..starting_folding_factor {
-            // We now start, the initial folding pow bits
+            // we now start, the initial folding pow bits
             let prox_gaps_error = basefold_parameters.security_assumption.prox_gaps_error(
                 current_log_degree - 1,
                 basefold_parameters.starting_log_inv_rate,
@@ -209,7 +209,7 @@ impl BasefoldProtocol {
 
             let mut pow_bits_vec = Vec::with_capacity(folding_factor);
             for _ in 0..folding_factor {
-                // We now start, the initial folding pow bits
+                // we now start, the initial folding pow bits
                 let prox_gaps_error = basefold_parameters.security_assumption.prox_gaps_error(
                     current_log_degree - 1,
                     basefold_parameters.starting_log_inv_rate,
