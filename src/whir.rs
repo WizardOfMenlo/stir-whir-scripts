@@ -217,7 +217,6 @@ impl WhirProtocol {
             current_log_degree -= 1;
         }
 
-
         let mut round_parameters = Vec::with_capacity(num_rounds);
 
         for (i, (folding_factor, next_rate)) in whir_parameters
@@ -236,10 +235,9 @@ impl WhirProtocol {
                 1 << folding_factor,
                 true,
             );
-            protocol_builder = protocol_builder
-                .prover_message(ProverMessage::new(ProofElement::MerkleRoot(
-                    next_merkle_tree,
-                )));
+            protocol_builder = protocol_builder.prover_message(ProverMessage::new(
+                ProofElement::MerkleRoot(next_merkle_tree),
+            ));
 
             // Compute the ood samples required
             let ood_samples = whir_parameters.security_assumption.determine_ood_samples(
