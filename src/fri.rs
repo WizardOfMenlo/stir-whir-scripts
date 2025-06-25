@@ -117,7 +117,7 @@ impl FriProtocol {
                 fri_parameters.starting_log_inv_rate,
                 ldt_parameters.field.extension_bit_size(),
                 ldt_parameters.batch_size,
-            ); // We now start, the initial folding pow bits
+            ); // we now start, the initial folding pow bits
             batching_pow_bits = pow_util(security_level, prox_gaps_error_batching);
 
             // Add the round for the batching
@@ -135,14 +135,14 @@ impl FriProtocol {
             starting_domain_log_size - starting_folding_factor,
             ldt_parameters.field,
             (1 << starting_folding_factor) * ldt_parameters.batch_size,
-            false, // First tree is over the base
+            false, // first tree is over the base
         );
         let mut commitments = vec![starting_merkle_tree];
 
         // Degree of next polynomial to send
         let mut current_log_degree = ldt_parameters.log_degree - starting_folding_factor;
 
-        // We now start, the initial folding pow bits
+        // we now start, the initial folding pow bits
         let starting_folding_prox_gaps_error = fri_parameters.security_assumption.prox_gaps_error(
             current_log_degree,
             fri_parameters.starting_log_inv_rate,
