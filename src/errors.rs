@@ -99,7 +99,7 @@ impl SecurityAssumption {
 
         // Error is  (num_functions - 1) * error/|F|;
         let num_functions_1_log = (num_functions as f64 - 1.).log2();
-        field_size_bits as f64 - (error + num_functions_1_log as f64)
+        field_size_bits as f64 - (error + num_functions_1_log)
     }
 
     /// The query error is (1 - δ)^t where t is the number of queries.
