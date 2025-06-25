@@ -12,7 +12,8 @@ use crate::{
 };
 
 /// Parameters parametrizing an instance of STIR.
-/// This does not include the entire configuration of STIR, as we populate that later on according to required security config.#[derive(Clone)]
+/// This does not include the entire configuration of STIR, as we populate that later on according to required security config.
+#[derive(Clone)]
 pub struct StirParameters {
     /// The starting rate used in the protocol.
     pub starting_log_inv_rate: usize,
