@@ -21,7 +21,7 @@ pub enum SecurityAssumption {
 }
 
 impl SecurityAssumption {
-    /// In both JB and CB theorems such as list-size only hold for proximity parameters slighly below the bound.
+    /// In both JB and CB theorems such as list-size only hold for proximity parameters slightly below the bound.
     /// E.g. in JB proximity gaps holds for every δ ∈ (0, 1 - √ρ).
     /// η is the distance between the chosen proximity parameter and the bound.
     /// I.e. in JB δ = 1 - √ρ - η and in CB δ = 1 - ρ - η.
