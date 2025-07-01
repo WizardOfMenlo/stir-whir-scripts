@@ -147,7 +147,7 @@ impl WhirProtocol {
                 whir_parameters.starting_log_inv_rate,
                 ldt_parameters.field.extension_bit_size(),
                 ldt_parameters.batch_size,
-            ); // We now start, the initial folding pow bits
+            ); // we now start, the initial folding pow bits
             batching_pow_bits = pow_util(security_level, prox_gaps_error_batching);
 
             // Add the round for the batching
@@ -165,7 +165,7 @@ impl WhirProtocol {
             starting_domain_log_size - starting_folding_factor,
             ldt_parameters.field,
             (1 << starting_folding_factor) * ldt_parameters.batch_size,
-            false, // First tree is over the base
+            false, // first tree is over the base
         );
 
         // Degree of next polynomial to send
@@ -177,7 +177,7 @@ impl WhirProtocol {
 
         protocol_builder = protocol_builder.start_round("whir_iteration");
         for _ in 0..whir_parameters.starting_folding_factor {
-            // We now start, the initial folding pow bits
+            // we now start, the initial folding pow bits
             let prox_gaps_error = whir_parameters.security_assumption.prox_gaps_error(
                 current_log_degree - 1,
                 log_inv_rate,
@@ -317,7 +317,7 @@ impl WhirProtocol {
 
             let mut pow_bits_vec = Vec::with_capacity(folding_factor);
             for _ in 0..folding_factor {
-                // We now start, the initial folding pow bits
+                // we now start, the initial folding pow bits
                 let prox_gaps_error = whir_parameters.security_assumption.prox_gaps_error(
                     current_log_degree - 1,
                     next_rate,
