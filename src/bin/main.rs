@@ -69,8 +69,8 @@ fn main() {
     );
     let whir_protocol = WhirProtocol::new(pcs_parameters, whir_parameters);
 
-    println!("{}", stir_protocol);
-    println!("{}", fri_protocol);
-    println!("{}", basefold_protocol);
-    println!("{}", whir_protocol);
+    println!("{stir_protocol}");
+    println!("{fri_protocol}");
+    println!("{basefold_protocol}");
+    println!("{whir_protocol}");
 }

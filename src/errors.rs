@@ -210,7 +210,7 @@ impl FromStr for SecurityAssumption {
         } else if s == "CapacityBound" {
             Ok(SecurityAssumption::CapacityBound)
         } else {
-            Err(format!("Invalid soundness specification: {}", s))
+            Err(format!("Invalid soundness specification: {s}"))
         }
     }
 }
