@@ -133,8 +133,8 @@ impl WhirProtocol {
 
         // Initial domain size (the trace domain)
         let starting_folding_factor = whir_parameters.starting_folding_factor;
-        let starting_domain_log_size =
-            ldt_parameters.log_degree + whir_parameters.starting_log_inv_rate;
+        let starting_domain_log_size = ldt_parameters.log_degree - starting_folding_factor
+            + whir_parameters.starting_log_inv_rate;
 
         let mut protocol_builder =
             ProtocolBuilder::new("WHIR protocol", whir_parameters.digest_size_bits);
@@ -162,7 +162,7 @@ impl WhirProtocol {
 
         // Merkle tree committed to
         let mut current_merkle_tree = MerkleTree::new(
-            starting_domain_log_size - starting_folding_factor,
+            starting_domain_log_size,
             ldt_parameters.field,
             (1 << starting_folding_factor) * ldt_parameters.batch_size,
             false, // first tree is over the base
@@ -226,11 +226,11 @@ impl WhirProtocol {
             .enumerate()
         {
             // This is the size of the new evaluation domain
-            let new_evaluation_domain_size = current_log_degree + next_rate;
+            let new_evaluation_domain_size = current_log_degree - folding_factor + next_rate;
 
             // Send the new oracle
             let next_merkle_tree = MerkleTree::new(
-                new_evaluation_domain_size - folding_factor,
+                new_evaluation_domain_size,
                 ldt_parameters.field,
                 1 << folding_factor,
                 true,
