@@ -493,7 +493,7 @@ pub(crate) struct RoundConfig {
     pub(crate) pow_bits: Vec<f64>,
     /// Number of queries in this round
     pub(crate) num_queries: usize,
-    /// Number of bits of proof of work (for the foldings).
+    /// Number of bits of proof of work (for the queries).
     pub(crate) query_pow_bits: f64,
     /// Number of OOD samples in this round
     pub(crate) ood_samples: usize,
