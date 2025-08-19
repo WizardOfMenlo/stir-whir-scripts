@@ -361,7 +361,7 @@ impl WhirProtocol {
                 folding_factor,
                 num_queries,
                 query_pow_bits,
-                pow_bits: pow_bits_vec,
+                folding_pow_bits: pow_bits_vec,
                 ood_samples,
                 log_inv_rate,
             };
@@ -420,7 +420,7 @@ impl WhirProtocol {
                 starting_folding_pow_bits: starting_folding_pow_bits_vec,
                 round_parameters,
                 final_queries,
-                final_pow_bits,
+                final_query_pow_bits: final_pow_bits,
                 final_poly_log_degree: final_log_degree,
                 final_log_inv_rate: log_inv_rate,
             },
@@ -476,7 +476,7 @@ pub struct WhirConfig {
     pub(crate) final_queries: usize,
 
     /// Number of final bits of proof of work (for the queries).
-    pub(crate) final_pow_bits: f64,
+    pub(crate) final_query_pow_bits: f64,
 
     /// Rate of the final RS codeword.
     pub(crate) final_log_inv_rate: usize,
@@ -490,7 +490,7 @@ pub(crate) struct RoundConfig {
     /// Size of evaluation domain (of oracle sent in this round)
     pub(crate) evaluation_domain_log_size: usize,
     /// Number of bits of proof of work (for the foldings).
-    pub(crate) pow_bits: Vec<f64>,
+    pub(crate) folding_pow_bits: Vec<f64>,
     /// Number of queries in this round
     pub(crate) num_queries: usize,
     /// Number of bits of proof of work (for the queries).
@@ -525,7 +525,7 @@ impl WhirConfig {
             )?;
         }
 
-        writeln!(
+        write!(
             f,
             "Initial folding factor: {}, initial_folding_pow_bits: ",
             self.starting_folding_factor,
@@ -542,7 +542,7 @@ impl WhirConfig {
             self.final_queries,
             self.final_poly_log_degree,
             self.final_log_inv_rate,
-            self.final_pow_bits,
+            self.final_query_pow_bits,
         )?;
 
         Ok(())
@@ -562,6 +562,6 @@ impl Display for RoundConfig {
             "Folding factor: {}, domain_size: 2^{}, num_queries: {}, query_pow: {:.1}, rate: 2^-{}, ood_samples: {}, pow_bits: ",
             self.folding_factor, self.evaluation_domain_log_size, self.num_queries, self.query_pow_bits, self.log_inv_rate, self.ood_samples,
         )?;
-        pretty_print_float_slice(f, &self.pow_bits)
+        pretty_print_float_slice(f, &self.folding_pow_bits)
     }
 }
