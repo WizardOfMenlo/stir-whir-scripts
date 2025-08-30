@@ -652,7 +652,12 @@ mod tests {
 
     #[test]
     fn test_security_schedule_replication() {
-        let ldt = LowDegreeParameters { field: GOLDILOCKS_2, log_degree: 20, batch_size: 1, constraint_degree: 2 };
+        let ldt = LowDegreeParameters {
+            field: GOLDILOCKS_2,
+            log_degree: 20,
+            batch_size: 1,
+            constraint_degree: 2,
+        };
         let params = WhirParameters::fixed_rate_folding(
             1, // log_inv_rate
             2, // folding_factor
@@ -679,7 +684,12 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_security_schedule_mismatch_panics() {
-        let ldt = LowDegreeParameters { field: GOLDILOCKS_2, log_degree: 20, batch_size: 1, constraint_degree: 2 };
+        let ldt = LowDegreeParameters {
+            field: GOLDILOCKS_2,
+            log_degree: 20,
+            batch_size: 1,
+            constraint_degree: 2,
+        };
         let params = WhirParameters::fixed_rate_folding_with_schedule(
             1,
             2,

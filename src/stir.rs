@@ -594,7 +594,12 @@ mod tests {
 
     #[test]
     fn test_security_schedule_replication() {
-        let ldt = LowDegreeParameters { field: GOLDILOCKS_2, log_degree: 20, batch_size: 1, constraint_degree: 0 };
+        let ldt = LowDegreeParameters {
+            field: GOLDILOCKS_2,
+            log_degree: 20,
+            batch_size: 1,
+            constraint_degree: 0,
+        };
         let params = StirParameters::fixed_rate_folding(
             1, // log_inv_rate
             2, // folding_factor
@@ -623,7 +628,12 @@ mod tests {
     #[should_panic]
     fn test_security_schedule_mismatch_panics() {
         // Construct via with_schedule with wrong length should panic
-        let ldt = LowDegreeParameters { field: GOLDILOCKS_2, log_degree: 20, batch_size: 1, constraint_degree: 0 };
+        let ldt = LowDegreeParameters {
+            field: GOLDILOCKS_2,
+            log_degree: 20,
+            batch_size: 1,
+            constraint_degree: 0,
+        };
         let params = StirParameters::fixed_rate_folding_with_schedule(
             1,
             2,
