@@ -29,8 +29,9 @@ pub struct StirParameters {
     /// The rates used in the internal rounds of STIR.
     pub log_inv_rates: Vec<usize>,
 
-    /// The security assumption under which to configure STIR.
-    pub security_assumption: SecurityAssumption,
+    /// The security assumptions to use per round (length must equal number of rounds).
+    /// If constructed via single-assumption builders, this is replicated across rounds.
+    pub security_assumptions: Vec<SecurityAssumption>,
 
     /// The security level desired.
     pub security_level: usize,
@@ -60,7 +61,7 @@ impl StirParameters {
             starting_folding_factor: folding_factor,
             folding_factors: vec![folding_factor; num_rounds],
             log_inv_rates: vec![log_inv_rate; num_rounds],
-            security_assumption,
+            security_assumptions: vec![security_assumption; num_rounds],
             security_level,
             digest_size_bits,
             pow_bits,
@@ -85,7 +86,63 @@ impl StirParameters {
             log_inv_rates: (0..num_rounds)
                 .map(|i| log_inv_rate + (i + 1) * (folding_factor - 1))
                 .collect(),
-            security_assumption,
+            security_assumptions: vec![security_assumption; num_rounds],
+            digest_size_bits,
+            security_level,
+            pow_bits,
+        }
+    }
+
+    /// A version of fixed_rate_folding that accepts a per-round schedule of security assumptions.
+    pub fn fixed_rate_folding_with_schedule(
+        log_inv_rate: usize,
+        folding_factor: usize,
+        num_rounds: usize,
+        security_assumptions: Vec<SecurityAssumption>,
+        security_level: usize,
+        pow_bits: usize,
+        digest_size_bits: usize,
+    ) -> Self {
+        assert_eq!(
+            security_assumptions.len(),
+            num_rounds,
+            "security_assumptions length must equal number of rounds"
+        );
+        StirParameters {
+            starting_log_inv_rate: log_inv_rate,
+            starting_folding_factor: folding_factor,
+            folding_factors: vec![folding_factor; num_rounds],
+            log_inv_rates: vec![log_inv_rate; num_rounds],
+            security_assumptions,
+            security_level,
+            digest_size_bits,
+            pow_bits,
+        }
+    }
+
+    /// A version of fixed_domain_shift that accepts a per-round schedule of security assumptions.
+    pub fn fixed_domain_shift_with_schedule(
+        log_inv_rate: usize,
+        folding_factor: usize,
+        num_rounds: usize,
+        security_assumptions: Vec<SecurityAssumption>,
+        security_level: usize,
+        pow_bits: usize,
+        digest_size_bits: usize,
+    ) -> Self {
+        assert_eq!(
+            security_assumptions.len(),
+            num_rounds,
+            "security_assumptions length must equal number of rounds"
+        );
+        StirParameters {
+            starting_log_inv_rate: log_inv_rate,
+            starting_folding_factor: folding_factor,
+            folding_factors: vec![folding_factor; num_rounds],
+            log_inv_rates: (0..num_rounds)
+                .map(|i| log_inv_rate + (i + 1) * (folding_factor - 1))
+                .collect(),
+            security_assumptions,
             digest_size_bits,
             security_level,
             pow_bits,
@@ -128,6 +185,11 @@ impl StirProtocol {
         // Compute the number of rounds and the leftover
         let final_log_degree = ldt_parameters.log_degree - total_reduction;
         let num_rounds = stir_parameters.folding_factors.len();
+        assert_eq!(
+            stir_parameters.security_assumptions.len(),
+            num_rounds,
+            "security_assumptions length must equal number of rounds"
+        );
 
         // Compute the security level
         let security_level = stir_parameters.security_level;
@@ -145,7 +207,12 @@ impl StirProtocol {
         // Pow bits for the batching steps
         let mut batching_pow_bits = 0.;
         if ldt_parameters.batch_size > 1 {
-            let prox_gaps_error_batching = stir_parameters.security_assumption.prox_gaps_error(
+            let first_assumption = stir_parameters
+                .security_assumptions
+                .first()
+                .cloned()
+                .expect("non-empty security assumptions");
+            let prox_gaps_error_batching = first_assumption.prox_gaps_error(
                 ldt_parameters.log_degree,
                 stir_parameters.starting_log_inv_rate,
                 ldt_parameters.field.extension_bit_size(),
@@ -176,7 +243,12 @@ impl StirProtocol {
         let mut log_inv_rate = stir_parameters.starting_log_inv_rate;
 
         // we now start, the initial folding pow bits
-        let starting_folding_prox_gaps_error = stir_parameters.security_assumption.prox_gaps_error(
+        let first_assumption = stir_parameters
+            .security_assumptions
+            .first()
+            .cloned()
+            .expect("non-empty security assumptions");
+        let starting_folding_prox_gaps_error = first_assumption.prox_gaps_error(
             current_log_degree,
             log_inv_rate,
             ldt_parameters.field.extension_bit_size(),
@@ -196,11 +268,14 @@ impl StirProtocol {
 
         let mut round_parameters = Vec::with_capacity(num_rounds);
 
-        for (folding_factor, next_rate) in stir_parameters
+        for (round_idx, (folding_factor, next_rate)) in stir_parameters
             .folding_factors
-            .into_iter()
-            .zip(stir_parameters.log_inv_rates)
+            .iter()
+            .copied()
+            .zip(stir_parameters.log_inv_rates.iter().copied())
+            .enumerate()
         {
+            let round_assumption = stir_parameters.security_assumptions[round_idx];
             // This is the size of the new evaluation domain
             let new_evaluation_domain_size = current_log_degree + next_rate;
 
@@ -218,7 +293,7 @@ impl StirProtocol {
                 )));
 
             // Compute the ood samples required
-            let ood_samples = stir_parameters.security_assumption.determine_ood_samples(
+            let ood_samples = round_assumption.determine_ood_samples(
                 security_level,
                 current_log_degree,
                 next_rate,
@@ -227,7 +302,7 @@ impl StirProtocol {
 
             // Add OOD rounds to protocol
             if ood_samples > 0 {
-                let ood_error = stir_parameters.security_assumption.ood_error(
+                let ood_error = round_assumption.ood_error(
                     current_log_degree,
                     next_rate,
                     ldt_parameters.field.extension_bit_size(),
@@ -249,24 +324,20 @@ impl StirProtocol {
             }
 
             // Compute the number of queries required
-            let num_queries = stir_parameters
-                .security_assumption
-                .queries(protocol_security_level, log_inv_rate);
+            let num_queries = round_assumption.queries(protocol_security_level, log_inv_rate);
 
             // We need to compute the errors, to compute the according PoW
-            let query_error = stir_parameters
-                .security_assumption
-                .queries_error(log_inv_rate, num_queries);
+            let query_error = round_assumption.queries_error(log_inv_rate, num_queries);
 
             let num_terms = num_queries + ood_samples;
-            let prox_gaps_error_1 = stir_parameters.security_assumption.prox_gaps_error(
+            let prox_gaps_error_1 = round_assumption.prox_gaps_error(
                 current_log_degree,
                 next_rate,
                 ldt_parameters.field.extension_bit_size(),
                 num_terms,
             );
 
-            let prox_gaps_error_2 = stir_parameters.security_assumption.prox_gaps_error(
+            let prox_gaps_error_2 = round_assumption.prox_gaps_error(
                 current_log_degree - folding_factor,
                 next_rate,
                 ldt_parameters.field.extension_bit_size(),
@@ -312,14 +383,15 @@ impl StirProtocol {
         }
 
         // Compute the number of queries required
-        let final_queries = stir_parameters
-            .security_assumption
-            .queries(protocol_security_level, log_inv_rate);
+        let last_assumption = stir_parameters
+            .security_assumptions
+            .last()
+            .cloned()
+            .expect("non-empty security assumptions");
+        let final_queries = last_assumption.queries(protocol_security_level, log_inv_rate);
 
         // We need to compute the errors, to compute the according PoW
-        let query_error = stir_parameters
-            .security_assumption
-            .queries_error(log_inv_rate, final_queries);
+        let query_error = last_assumption.queries_error(log_inv_rate, final_queries);
 
         // Now compute the PoW
         let final_pow_bits = pow_util(security_level, query_error);
@@ -349,7 +421,12 @@ impl StirProtocol {
         StirProtocol {
             config: StirConfig {
                 ldt_parameters,
-                security_assumption: stir_parameters.security_assumption,
+                security_assumption: stir_parameters
+                    .security_assumptions
+                    .last()
+                    .cloned()
+                    .expect("non-empty security assumptions"),
+                security_assumptions: stir_parameters.security_assumptions.clone(),
                 security_level,
                 max_pow_bits: stir_parameters.pow_bits,
                 batching_pow_bits,
@@ -383,6 +460,8 @@ pub struct StirConfig {
 
     /// The security assumption under which STIR was configured.
     pub(crate) security_assumption: SecurityAssumption,
+    /// Optional per-round schedule (printed if length > 1)
+    pub(crate) security_assumptions: Vec<SecurityAssumption>,
 
     /// The desired security level.
     pub(crate) security_level: usize,
@@ -448,6 +527,14 @@ impl StirConfig {
             self.security_level, self.security_assumption, self.max_pow_bits
         )?;
 
+        if self.security_assumptions.len() > 1 {
+            writeln!(
+                f,
+                "Security schedule per round: {:?}",
+                self.security_assumptions
+            )?;
+        }
+
         writeln!(
             f,
             "Initial domain size: 2^{}, initial rate 2^-{}",
@@ -497,5 +584,55 @@ impl Display for RoundConfig {
             "Folding factor: {}, domain_size: 2^{}, num_queries: {}, rate: 2^-{}, ood_samples: {}, pow_bits: {:.1}",
             self.folding_factor, self.evaluation_domain_log_size, self.num_queries, self.log_inv_rate, self.ood_samples, self.pow_bits
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{errors::SecurityAssumption, field::GOLDILOCKS_2, LowDegreeParameters};
+
+    #[test]
+    fn test_security_schedule_replication() {
+        let ldt = LowDegreeParameters { field: GOLDILOCKS_2, log_degree: 20, batch_size: 1, constraint_degree: 0 };
+        let params = StirParameters::fixed_rate_folding(
+            1, // log_inv_rate
+            2, // folding_factor
+            3, // num_rounds
+            SecurityAssumption::UniqueDecoding,
+            80,
+            10,
+            256,
+        );
+        let proto = StirProtocol::new(ldt, params);
+        assert_eq!(proto.config.security_assumptions.len(), 3);
+        use std::mem::discriminant;
+        assert!(proto
+            .config
+            .security_assumptions
+            .iter()
+            .all(|&a| discriminant(&a) == discriminant(&SecurityAssumption::UniqueDecoding)));
+        // The single config field equals the last element (by variant)
+        assert!(
+            discriminant(&proto.config.security_assumption)
+                == discriminant(&proto.config.security_assumptions.last().copied().unwrap())
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_security_schedule_mismatch_panics() {
+        // Construct via with_schedule with wrong length should panic
+        let ldt = LowDegreeParameters { field: GOLDILOCKS_2, log_degree: 20, batch_size: 1, constraint_degree: 0 };
+        let params = StirParameters::fixed_rate_folding_with_schedule(
+            1,
+            2,
+            3,
+            vec![SecurityAssumption::UniqueDecoding; 2], // wrong len
+            80,
+            10,
+            256,
+        );
+        let _ = StirProtocol::new(ldt, params);
     }
 }

@@ -29,8 +29,9 @@ pub struct WhirParameters {
     /// The rates used in the internal rounds of WHIR.
     pub log_inv_rates: Vec<usize>,
 
-    /// The security assumption under which to configure WHIR.
-    pub security_assumption: SecurityAssumption,
+    /// The security assumptions to use per round (length must equal number of rounds).
+    /// If constructed via single-assumption builders, this is replicated across rounds.
+    pub security_assumptions: Vec<SecurityAssumption>,
 
     /// The security level desired.
     pub security_level: usize,
@@ -60,7 +61,7 @@ impl WhirParameters {
             starting_folding_factor: folding_factor,
             folding_factors: vec![folding_factor; num_rounds],
             log_inv_rates: vec![log_inv_rate; num_rounds],
-            security_assumption,
+            security_assumptions: vec![security_assumption; num_rounds],
             security_level,
             digest_size_bits,
             pow_bits,
@@ -85,7 +86,63 @@ impl WhirParameters {
             log_inv_rates: (0..num_rounds)
                 .map(|i| log_inv_rate + (i + 1) * (folding_factor - 1))
                 .collect(),
-            security_assumption,
+            security_assumptions: vec![security_assumption; num_rounds],
+            digest_size_bits,
+            security_level,
+            pow_bits,
+        }
+    }
+
+    /// A WHIR configuration with an explicit per-round schedule of security assumptions.
+    pub fn fixed_rate_folding_with_schedule(
+        log_inv_rate: usize,
+        folding_factor: usize,
+        num_rounds: usize,
+        security_assumptions: Vec<SecurityAssumption>,
+        security_level: usize,
+        pow_bits: usize,
+        digest_size_bits: usize,
+    ) -> Self {
+        assert_eq!(
+            security_assumptions.len(),
+            num_rounds,
+            "security_assumptions length must equal number of rounds"
+        );
+        WhirParameters {
+            starting_log_inv_rate: log_inv_rate,
+            starting_folding_factor: folding_factor,
+            folding_factors: vec![folding_factor; num_rounds],
+            log_inv_rates: vec![log_inv_rate; num_rounds],
+            security_assumptions,
+            security_level,
+            digest_size_bits,
+            pow_bits,
+        }
+    }
+
+    /// A WHIR configuration in which the domain shrinks by (1/2) in each iteration, with a per-round security schedule.
+    pub fn fixed_domain_shift_with_schedule(
+        log_inv_rate: usize,
+        folding_factor: usize,
+        num_rounds: usize,
+        security_assumptions: Vec<SecurityAssumption>,
+        security_level: usize,
+        pow_bits: usize,
+        digest_size_bits: usize,
+    ) -> Self {
+        assert_eq!(
+            security_assumptions.len(),
+            num_rounds,
+            "security_assumptions length must equal number of rounds"
+        );
+        WhirParameters {
+            starting_log_inv_rate: log_inv_rate,
+            starting_folding_factor: folding_factor,
+            folding_factors: vec![folding_factor; num_rounds],
+            log_inv_rates: (0..num_rounds)
+                .map(|i| log_inv_rate + (i + 1) * (folding_factor - 1))
+                .collect(),
+            security_assumptions,
             digest_size_bits,
             security_level,
             pow_bits,
@@ -125,6 +182,11 @@ impl WhirProtocol {
         // Compute the number of rounds and the leftover
         let final_log_degree = ldt_parameters.log_degree - total_reduction;
         let num_rounds = whir_parameters.folding_factors.len();
+        assert_eq!(
+            whir_parameters.security_assumptions.len(),
+            num_rounds,
+            "security_assumptions length must equal number of rounds"
+        );
 
         // Compute the security level
         let security_level = whir_parameters.security_level;
@@ -142,7 +204,12 @@ impl WhirProtocol {
         // Pow bits for the batching steps
         let mut batching_pow_bits = 0.;
         if ldt_parameters.batch_size > 1 {
-            let prox_gaps_error_batching = whir_parameters.security_assumption.prox_gaps_error(
+            let first_assumption = whir_parameters
+                .security_assumptions
+                .first()
+                .cloned()
+                .expect("non-empty security assumptions");
+            let prox_gaps_error_batching = first_assumption.prox_gaps_error(
                 ldt_parameters.log_degree,
                 whir_parameters.starting_log_inv_rate,
                 ldt_parameters.field.extension_bit_size(),
@@ -176,23 +243,26 @@ impl WhirProtocol {
             Vec::with_capacity(whir_parameters.starting_folding_factor);
 
         protocol_builder = protocol_builder.start_round("whir_iteration");
+        let first_assumption = whir_parameters
+            .security_assumptions
+            .first()
+            .cloned()
+            .expect("non-empty security assumptions");
         for _ in 0..whir_parameters.starting_folding_factor {
             // we now start, the initial folding pow bits
-            let prox_gaps_error = whir_parameters.security_assumption.prox_gaps_error(
+            let prox_gaps_error = first_assumption.prox_gaps_error(
                 current_log_degree - 1,
                 log_inv_rate,
                 ldt_parameters.field.extension_bit_size(),
                 1 << starting_folding_factor,
             );
 
-            let sumcheck_error = whir_parameters
-                .security_assumption
-                .constraint_folding_error(
-                    current_log_degree,
-                    log_inv_rate,
-                    ldt_parameters.field.extension_bit_size(),
-                    ldt_parameters.constraint_degree,
-                );
+            let sumcheck_error = first_assumption.constraint_folding_error(
+                current_log_degree,
+                log_inv_rate,
+                ldt_parameters.field.extension_bit_size(),
+                ldt_parameters.constraint_degree,
+            );
 
             let starting_folding_pow_bits =
                 pow_util(security_level, prox_gaps_error.min(sumcheck_error));
@@ -221,10 +291,12 @@ impl WhirProtocol {
 
         for (i, (folding_factor, next_rate)) in whir_parameters
             .folding_factors
-            .into_iter()
-            .zip(whir_parameters.log_inv_rates)
+            .iter()
+            .copied()
+            .zip(whir_parameters.log_inv_rates.iter().copied())
             .enumerate()
         {
+            let round_assumption = whir_parameters.security_assumptions[i];
             // This is the size of the new evaluation domain
             let new_evaluation_domain_size = current_log_degree - folding_factor + next_rate;
 
@@ -240,7 +312,7 @@ impl WhirProtocol {
             ));
 
             // Compute the ood samples required
-            let ood_samples = whir_parameters.security_assumption.determine_ood_samples(
+            let ood_samples = round_assumption.determine_ood_samples(
                 security_level,
                 current_log_degree,
                 next_rate,
@@ -249,7 +321,7 @@ impl WhirProtocol {
 
             // Add OOD rounds to protocol
             if ood_samples > 0 {
-                let ood_error = whir_parameters.security_assumption.ood_error(
+                let ood_error = round_assumption.ood_error(
                     current_log_degree,
                     next_rate,
                     ldt_parameters.field.extension_bit_size(),
@@ -271,24 +343,18 @@ impl WhirProtocol {
             }
 
             // Compute the number of queries required
-            let num_queries = whir_parameters
-                .security_assumption
-                .queries(protocol_security_level, log_inv_rate);
+            let num_queries = round_assumption.queries(protocol_security_level, log_inv_rate);
 
             // We need to compute the errors, to compute the according PoW
-            let query_error = whir_parameters
-                .security_assumption
-                .queries_error(log_inv_rate, num_queries);
+            let query_error = round_assumption.queries_error(log_inv_rate, num_queries);
 
             let num_terms = num_queries + ood_samples;
-            let batching_error = whir_parameters
-                .security_assumption
-                .constraint_folding_error(
-                    current_log_degree,
-                    log_inv_rate,
-                    ldt_parameters.field.extension_bit_size(),
-                    num_terms,
-                );
+            let batching_error = round_assumption.constraint_folding_error(
+                current_log_degree,
+                log_inv_rate,
+                ldt_parameters.field.extension_bit_size(),
+                num_terms,
+            );
 
             // Now compute the PoW
             let query_pow_bits = pow_util(security_level, query_error.min(batching_error));
@@ -318,21 +384,19 @@ impl WhirProtocol {
             let mut pow_bits_vec = Vec::with_capacity(folding_factor);
             for _ in 0..folding_factor {
                 // we now start, the initial folding pow bits
-                let prox_gaps_error = whir_parameters.security_assumption.prox_gaps_error(
+                let prox_gaps_error = round_assumption.prox_gaps_error(
                     current_log_degree - 1,
                     next_rate,
                     ldt_parameters.field.extension_bit_size(),
                     2,
                 );
 
-                let sumcheck_error = whir_parameters
-                    .security_assumption
-                    .constraint_folding_error(
-                        current_log_degree,
-                        next_rate,
-                        ldt_parameters.field.extension_bit_size(),
-                        ldt_parameters.constraint_degree.max(2),
-                    );
+                let sumcheck_error = round_assumption.constraint_folding_error(
+                    current_log_degree,
+                    next_rate,
+                    ldt_parameters.field.extension_bit_size(),
+                    ldt_parameters.constraint_degree.max(2),
+                );
 
                 let starting_folding_pow_bits =
                     pow_util(security_level, prox_gaps_error.min(sumcheck_error));
@@ -373,14 +437,15 @@ impl WhirProtocol {
         protocol_builder = protocol_builder.end_round();
 
         // Compute the number of queries required
-        let final_queries = whir_parameters
-            .security_assumption
-            .queries(protocol_security_level, log_inv_rate);
+        let last_assumption = whir_parameters
+            .security_assumptions
+            .last()
+            .cloned()
+            .expect("non-empty security assumptions");
+        let final_queries = last_assumption.queries(protocol_security_level, log_inv_rate);
 
         // We need to compute the errors, to compute the according PoW
-        let query_error = whir_parameters
-            .security_assumption
-            .queries_error(log_inv_rate, final_queries);
+        let query_error = last_assumption.queries_error(log_inv_rate, final_queries);
 
         // Now compute the PoW
         let final_pow_bits = pow_util(security_level, query_error);
@@ -410,7 +475,12 @@ impl WhirProtocol {
         WhirProtocol {
             config: WhirConfig {
                 ldt_parameters,
-                security_assumption: whir_parameters.security_assumption,
+                security_assumption: whir_parameters
+                    .security_assumptions
+                    .last()
+                    .cloned()
+                    .expect("non-empty security assumptions"),
+                security_assumptions: whir_parameters.security_assumptions.clone(),
                 security_level,
                 max_pow_bits: whir_parameters.pow_bits,
                 batching_pow_bits,
@@ -444,6 +514,8 @@ pub struct WhirConfig {
 
     /// The security assumption under which WHIR was configured.
     pub(crate) security_assumption: SecurityAssumption,
+    /// Optional per-round schedule (printed if length > 1)
+    pub(crate) security_assumptions: Vec<SecurityAssumption>,
 
     /// The desired security level.
     pub(crate) security_level: usize,
@@ -510,6 +582,13 @@ impl WhirConfig {
             "Security level: {} bits using {} security and {} bits of PoW",
             self.security_level, self.security_assumption, self.max_pow_bits
         )?;
+        if self.security_assumptions.len() > 1 {
+            writeln!(
+                f,
+                "Security schedule per round: {:?}",
+                self.security_assumptions
+            )?;
+        }
 
         writeln!(
             f,
@@ -563,5 +642,53 @@ impl Display for RoundConfig {
             self.folding_factor, self.evaluation_domain_log_size, self.num_queries, self.query_pow_bits, self.log_inv_rate, self.ood_samples,
         )?;
         pretty_print_float_slice(f, &self.folding_pow_bits)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{errors::SecurityAssumption, field::GOLDILOCKS_2, LowDegreeParameters};
+
+    #[test]
+    fn test_security_schedule_replication() {
+        let ldt = LowDegreeParameters { field: GOLDILOCKS_2, log_degree: 20, batch_size: 1, constraint_degree: 2 };
+        let params = WhirParameters::fixed_rate_folding(
+            1, // log_inv_rate
+            2, // folding_factor
+            3, // num_rounds
+            SecurityAssumption::UniqueDecoding,
+            80,
+            10,
+            256,
+        );
+        let proto = WhirProtocol::new(ldt, params);
+        assert_eq!(proto.config.security_assumptions.len(), 3);
+        use std::mem::discriminant;
+        assert!(proto
+            .config
+            .security_assumptions
+            .iter()
+            .all(|&a| discriminant(&a) == discriminant(&SecurityAssumption::UniqueDecoding)));
+        assert!(
+            discriminant(&proto.config.security_assumption)
+                == discriminant(&proto.config.security_assumptions.last().copied().unwrap())
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_security_schedule_mismatch_panics() {
+        let ldt = LowDegreeParameters { field: GOLDILOCKS_2, log_degree: 20, batch_size: 1, constraint_degree: 2 };
+        let params = WhirParameters::fixed_rate_folding_with_schedule(
+            1,
+            2,
+            3,
+            vec![SecurityAssumption::UniqueDecoding; 2], // wrong len
+            80,
+            10,
+            256,
+        );
+        let _ = WhirProtocol::new(ldt, params);
     }
 }
